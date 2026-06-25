@@ -1,11 +1,10 @@
-# XPLock
+# ColumnTamer
 
-Lock macOS Finder column-view **preview pane** to a fixed width. Stops the
-erratic resize that pushes file columns off-screen. 11+ year old Apple bug,
-unfixed through macOS Tahoe.
+Fix macOS Finder column-view column behavior. Currently: **locks the preview pane** to a fixed width, stopping the erratic resize that pushes file columns off-screen. 11+ year Apple bug, unfixed through macOS Tahoe.
 
-`XtraFinder` fixes file-column width but **skips the preview pane by design**.
-XPLock closes that gap by swizzling AppKit's `NSBrowser` width setters.
+Planned: column width resizing (eventually replace XtraFinder's feature for users who don't need other XF features).
+
+`XtraFinder` fixes file-column width but **skips the preview pane by design**. ColumnTamer closes that gap by swizzling AppKit's `NSBrowser` width setters.
 
 ## How it works
 
@@ -29,44 +28,58 @@ Preview column detected via `+[NSBrowser previewColumnViewControllerClass]`
 ## Build
 
 ```bash
-./build.sh
+./build.sh        # osax only
+./build_pkg.sh    # osax + .pkg installer
 ```
 
-Produces `build/XPLock.osax` (universal arm64 + arm64e, unsigned).
+Produces `build/ColumnTamer.osax` and `build/ColumnTamer-0.1.0.pkg`
+(universal arm64 + arm64e, ad-hoc signed).
 
 ## Install
 
 ```bash
-./install.sh
+sudo installer -pkg build/ColumnTamer-0.1.0.pkg -target /
 ```
 
-- Copies osax → `/Library/ScriptingAdditions/XPLock.osax`
-- Installs watcher → `~/.local/bin/xplock-reinject`
-- Installs LaunchAgent → `~/Library/LaunchAgents/com.local.xplock-reinject.plist`
-- Re-injects into Finder automatically on Finder restart.
+Installs:
+- osax → `/Library/ScriptingAdditions/ColumnTamer.osax`
+- helper → `/Library/Application Support/ColumnTamer/ColumnTamerHelper`
+- LaunchAgent → `/Library/LaunchAgents/com.local.columntamer.helper.plist`
 
-## Tune
+Helper watches Finder PID, auto-injects on Finder restart.
+
+## Uninstall
 
 ```bash
-defaults write com.apple.finder XPLockPreviewWidth -float 400
+./uninstall.sh
+```
+
+Removes everything (also cleans legacy `XPLock` artifacts from prior versions).
+
+## Tune preview width
+
+```bash
+defaults write com.apple.finder ColumnTamerPreviewWidth -float 400
 killall Finder
 ```
 
-Default width: 320px.
+Default width: 320px. Valid range: 100–2000px.
 
 ## Files
 
 - `src/main.m` — swizzle logic
-- `build.sh` — compile + bundle
-- `install.sh` — system install
-- `xplock-reinject` — Finder PID watcher
-- `com.local.xplock-reinject.plist` — LaunchAgent
+- `build.sh` — compile + bundle osax
+- `build_pkg.sh` — build + .pkg installer
+- `install.sh` — local dev install (no pkg)
+- `uninstall.sh` — remove all (incl legacy)
+- `ColumnTamerHelper` — Finder PID watcher
+- `com.local.columntamer.helper.plist` — LaunchAgent
 - `test_inject.sh` — manual dlopen test via lldb
 
 ## Status
 
-Prototype — working in initial testing. Not packaged for distribution yet.
+Prototype — preview-lock working. Not packaged for public distribution yet.
 
 ## License
 
-TBD (leaning MIT).
+MIT.

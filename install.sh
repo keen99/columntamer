@@ -1,46 +1,45 @@
 #!/bin/zsh
-# Install XPLock osax + reinject LaunchAgent. Run once after build.
+# Local install (no pkg). For dev/testing. Same layout as the pkg.
 set -eu
 cd "$(dirname "$0")"
-BUNDLE="$PWD/build/XPLock.osax"
-OSAX_DST="/Library/ScriptingAdditions/XPLock.osax"
-BIN="$HOME/.local/bin/xplock-reinject"
-PLIST="$HOME/Library/LaunchAgents/com.local.xplock-reinject.plist"
+
+OSAX="/Library/ScriptingAdditions/ColumnTamer.osax"
+APPROOT="/Library/Application Support/ColumnTamer"
+PLIST="/Library/LaunchAgents/com.local.columntamer.helper.plist"
 
 echo "=== install osax (sudo) ==="
 sudo -v
-sudo rm -rf "$OSAX_DST"
-sudo cp -R "$BUNDLE" "$OSAX_DST"
-sudo chown -R root:wheel "$OSAX_DST"
+sudo rm -rf "$OSAX"
+sudo cp -R build/ColumnTamer.osax "$OSAX"
+sudo chown -R root:wheel "$OSAX"
+sudo codesign --force --sign - "$OSAX"
 
-echo "=== install watcher bin ==="
-mkdir -p "$(dirname "$BIN")"
-cp xplock-reinject "$BIN"
-chmod 755 "$BIN"
+echo "=== install helper ==="
+sudo mkdir -p "$APPROOT/logs"
+sudo cp ColumnTamerHelper "$APPROOT/ColumnTamerHelper"
+sudo chmod 755 "$APPROOT/ColumnTamerHelper"
+sudo chmod 1777 "$APPROOT/logs"
 
 echo "=== install launchagent ==="
-mkdir -p "$(dirname "$PLIST")"
-cp com.local.xplock-reinject.plist "$PLIST"
+sudo cp com.local.columntamer.helper.plist "$PLIST"
 
 echo "=== validate ==="
 plutil -lint "$PLIST"
-codesign -dv "$OSAX_DST/Contents/MacOS/XPLock" 2>&1 | grep -i identifier || echo "unsigned (ok, libvalidation off)"
+codesign -dv "$OSAX" 2>&1 | grep -E "Identifier|Signature"
 
 echo "=== bootstrap agent ==="
 UIDU="$(id -u)"
 launchctl bootout gui/$UIDU "$PLIST" 2>/dev/null || true
-launchctl bootstrap gui/$UIDU "$PLIST"
-launchctl enable gui/$UIDU/com.local.xplock-reinject
-launchctl kickstart -k gui/$UIDU/com.local.xplock-reinject
+sudo launchctl bootstrap gui/$UIDU "$PLIST"
+sudo launchctl enable gui/$UIDU/com.local.columntamer.helper
+sudo launchctl kickstart -k gui/$UIDU/com.local.columntamer.helper
 
-echo "=== initial inject into running Finder ==="
+echo "=== initial inject ==="
 sleep 3
-/usr/bin/osascript -e 'tell application "Finder" to inject' 2>&1 || echo "(Finder may need restart)"
+/usr/bin/osascript -e 'tell application "Finder" to «event CTmrIjct»' 2>&1 || echo "(Finder may need restart)"
 
 echo
 echo "DONE"
-echo "osax:   $OSAX_DST"
-echo "agent:  $PLIST"
-echo "verify: log show --predicate 'process == \"Finder\"' --last 1m --info | grep XPLock"
-echo
-echo "tune width: defaults write com.apple.finder XPLockPreviewWidth -float 400 ; then restart Finder"
+echo "osax:  $OSAX"
+echo "agent: $PLIST"
+echo "verify: log show --predicate 'process == \"Finder\"' --last 1m --info | grep ColumnTamer"

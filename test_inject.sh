@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Test load XPLock dylib into live Finder. Finder must be running.
+# Test load ColumnTamer dylib into live Finder via lldb.
 set -eu
 DYLIB="$1"
 PID=$(pgrep -x Finder)

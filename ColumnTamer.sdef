@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE dictionary SYSTEM "file://localhost/System/Library/DTDs/sdef.dtd">
+<dictionary>
+	<suite name="ColumnTamer Suite" code="CTmr" description="ColumnTamer Scripting Addition">
+		<command name="columntamer" code="CTmrIjct" description="Load ColumnTamer">
+		</command>
+	</suite>
+</dictionary>

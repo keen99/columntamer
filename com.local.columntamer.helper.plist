@@ -4,11 +4,11 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.local.xplock-reinject</string>
+  <string>com.local.columntamer.helper</string>
 
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/draistrick/.local/bin/xplock-reinject</string>
+    <string>/Library/Application Support/ColumnTamer/ColumnTamerHelper</string>
   </array>
 
   <key>RunAtLoad</key>
@@ -18,9 +18,9 @@
   <true/>
 
   <key>StandardOutPath</key>
-  <string>/Users/draistrick/Library/Logs/xplock-reinject.log</string>
+  <string>/Library/Application Support/ColumnTamer/logs/ColumnTamerHelper.log</string>
 
   <key>StandardErrorPath</key>
-  <string>/Users/draistrick/Library/Logs/xplock-reinject.err</string>
+  <string>/Library/Application Support/ColumnTamer/logs/ColumnTamerHelper.err</string>
 </dict>
 </plist>
