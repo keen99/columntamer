@@ -50,6 +50,9 @@ for p in \
   rm -f "$p"
 done
 rm -f ~/.local/bin/xplock-reinject
+# per-user helper logs (M7: moved out of /Library)
+rm -rf ~/Library/Logs/ColumnTamer
+rm -f ~/.columntamer.menu.lock
 
 echo "=== forget pkg receipts ==="
 sudo pkgutil --forget com.local.columntamer 2>/dev/null || true

@@ -16,11 +16,5 @@
 
   <key>KeepAlive</key>
   <true/>
-
-  <key>StandardOutPath</key>
-  <string>/Library/Application Support/ColumnTamer/logs/ColumnTamerHelper.log</string>
-
-  <key>StandardErrorPath</key>
-  <string>/Library/Application Support/ColumnTamer/logs/ColumnTamerHelper.err</string>
 </dict>
 </plist>

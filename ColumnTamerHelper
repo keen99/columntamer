@@ -3,9 +3,14 @@
 # In-memory state only (no /tmp file). Reinject on helper restart = harmless
 # (osax idempotent — InstallHandler guards with CTmrEnabled flag).
 # Raw event «event CTmrIjct» bypasses sdef terminology load issues.
+# Logs to per-user ~/Library/Logs/ColumnTamer/ (helper runs as console user).
 set -u
 
-log() { /bin/echo "$(/bin/date '+%Y-%m-%d %H:%M:%S') $*"; }
+LOGDIR="${HOME}/Library/Logs/ColumnTamer"
+mkdir -p "$LOGDIR"
+LOG="${LOGDIR}/ColumnTamerHelper.log"
+
+log() { /bin/echo "$(/bin/date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG"; }
 
 log "ColumnTamerHelper started"
 

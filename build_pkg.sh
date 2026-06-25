@@ -26,7 +26,7 @@ echo "=== build menu app ==="
 echo "=== stage payload ==="
 rm -rf "$STAGE" "$SCRIPTS" "$PKG"
 mkdir -p "$STAGE/Library/ScriptingAdditions" \
-         "$STAGE/Library/Application Support/ColumnTamer/logs" \
+         "$STAGE/Library/Application Support/ColumnTamer" \
          "$STAGE/Library/LaunchAgents" \
          "$SCRIPTS"
 
@@ -54,29 +54,14 @@ CONSOLE_USER="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
 CONSOLE_UID="$(/usr/bin/id -u "$CONSOLE_USER" 2>/dev/null || true)"
 [[ -z "$CONSOLE_UID" ]] && exit 0
 
-# Detect GUI vs CLI install. GUI Installer.app in parent tree = interactive.
-# CLI `installer` (lowercase) = unattended → skip dialog, default restart Finder.
-is_gui_install() {
-  local pid=$$
-  while [[ "$pid" -gt 1 ]]; do
-    local name="$(/bin/ps -p "$pid" -o comm= 2>/dev/null)"
-    case "$name" in
-      *Installer.app*|*/Install) return 0;;
-    esac
-    pid="$(/bin/ps -p "$pid" -o ppid= 2>/dev/null | /usr/bin/tr -d ' ')"
-    [[ -z "$pid" ]] && break
-  done
-  return 1
-}
-
-if ! is_gui_install; then
-  # CLI install: no GUI to show dialog. Default: restart Finder.
+# Native installer context: COMMAND_LINE_INSTALL=1 -> CLI `installer` binary.
+# Unset -> GUI Installer.app. CLI = unattended: skip dialog, default restart.
+if [[ "${COMMAND_LINE_INSTALL:-0}" == "1" ]]; then
   /bin/echo "yes" > "$FLAG"
   exit 0
 fi
 
 RESULT="$(/bin/launchctl asuser "$CONSOLE_UID" /usr/bin/sudo -u "$CONSOLE_USER" /usr/bin/osascript -e '
-  tell application "SystemUIServer" to activate
   return button returned of (display dialog "ColumnTamer will be installed." & return & return & "Restart Finder afterward to activate?" with title "ColumnTamer" buttons {"Later", "Restart After Install"} default button "Restart After Install" with icon note giving up after 300)
 ' 2>/dev/null || true)"
 
@@ -96,12 +81,19 @@ set -e
 BIN="/Library/Application Support/ColumnTamer/ColumnTamerHelper"
 HELPER_PLIST="/Library/LaunchAgents/com.local.columntamer.helper.plist"
 MENU_PLIST="/Library/LaunchAgents/com.local.columntamer.menu.plist"
-LOGDIR="/Library/Application Support/ColumnTamer/logs"
 FLAG="/tmp/.columntamer.restart-finder"
 
 chmod 755 "$BIN"
-mkdir -p "$LOGDIR"
-chmod 1777 "$LOGDIR"
+
+# M7: remove stale shared logdir from older installs (was 1777 symlink trap).
+# Logs now per-user at ~/Library/Logs/ColumnTamer/.
+rm -rf "/Library/Application Support/ColumnTamer/logs"
+
+# M6: pin ownership to root:wheel (installer runs as root; staged files
+# otherwise may carry dev-user ownership = persistence vector).
+chown -R root:wheel "/Library/ScriptingAdditions/ColumnTamer.osax"
+chown -R root:wheel "/Library/Application Support/ColumnTamer"
+chown root:wheel "$HELPER_PLIST" "$MENU_PLIST"
 
 CONSOLE_USER="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
 CONSOLE_UID="$(/usr/bin/id -u "$CONSOLE_USER" 2>/dev/null || true)"
