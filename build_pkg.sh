@@ -55,7 +55,8 @@ CONSOLE_UID="$(/usr/bin/id -u "$CONSOLE_USER" 2>/dev/null || true)"
 [[ -z "$CONSOLE_UID" ]] && exit 0
 
 RESULT="$(/bin/launchctl asuser "$CONSOLE_UID" /usr/bin/sudo -u "$CONSOLE_USER" /usr/bin/osascript -e '
-  return button returned of (display dialog "ColumnTamer will be installed." & return & return & "Restart Finder afterward to activate?" with title "ColumnTamer" buttons {"Later", "Restart After Install"} default button "Restart After Install" with icon note)
+  tell application "SystemUIServer" to activate
+  return button returned of (display dialog "ColumnTamer will be installed." & return & return & "Restart Finder afterward to activate?" with title "ColumnTamer" buttons {"Later", "Restart After Install"} default button "Restart After Install" with icon note giving up after 300)
 ' 2>/dev/null || true)"
 
 if [[ "$RESULT" == *"Restart After Install"* ]]; then
@@ -71,9 +72,9 @@ cat > "$SCRIPTS/postinstall" <<'POSTINSTALL'
 # postinstall: bootstrap LaunchAgent + restart Finder if user agreed preinstall.
 set -e
 
-OSAX="/Library/ScriptingAdditions/ColumnTamer.osax"
 BIN="/Library/Application Support/ColumnTamer/ColumnTamerHelper"
-PLIST="/Library/LaunchAgents/com.local.columntamer.helper.plist"
+HELPER_PLIST="/Library/LaunchAgents/com.local.columntamer.helper.plist"
+MENU_PLIST="/Library/LaunchAgents/com.local.columntamer.menu.plist"
 LOGDIR="/Library/Application Support/ColumnTamer/logs"
 FLAG="/tmp/.columntamer.restart-finder"
 
@@ -84,22 +85,15 @@ chmod 1777 "$LOGDIR"
 CONSOLE_USER="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
 CONSOLE_UID="$(/usr/bin/id -u "$CONSOLE_USER" 2>/dev/null || true)"
 
-# bootstrap helper agent
+# bootstrap agents AS USER. RunAtLoad=true auto-launches; no kickstart (blocks).
+# bootstrap runs backgrounded so postinstall returns fast.
 if [[ -n "$CONSOLE_UID" ]]; then
-  /bin/launchctl bootout gui/$CONSOLE_UID "$PLIST" 2>/dev/null || true
-  /bin/launchctl bootstrap gui/$CONSOLE_UID "$PLIST"
-  /bin/launchctl enable gui/$CONSOLE_UID/com.local.columntamer.helper
-  /bin/launchctl kickstart -k gui/$CONSOLE_UID/com.local.columntamer.helper
-fi
-
-# launch menu app via its own LaunchAgent (launchd-managed).
-# Start-at-login checkbox reads launchctl list -> default ON after install.
-MENU_PLIST="/Library/LaunchAgents/com.local.columntamer.menu.plist"
-if [[ -n "$CONSOLE_UID" ]]; then
-  /bin/launchctl bootout gui/$CONSOLE_UID "$MENU_PLIST" 2>/dev/null || true
-  /bin/launchctl bootstrap gui/$CONSOLE_UID "$MENU_PLIST"
-  /bin/launchctl enable gui/$CONSOLE_UID/com.local.columntamer.menu
-  /bin/launchctl kickstart -k gui/$CONSOLE_UID/com.local.columntamer.menu
+  /usr/bin/sudo -u "$CONSOLE_USER" /bin/launchctl bootout gui/$CONSOLE_UID "$HELPER_PLIST" 2>/dev/null || true
+  /usr/bin/sudo -u "$CONSOLE_USER" /bin/launchctl bootout gui/$CONSOLE_UID/com.local.columntamer.menu 2>/dev/null || true
+  /usr/bin/sudo -u "$CONSOLE_USER" /bin/launchctl bootout gui/$CONSOLE_UID "$MENU_PLIST" 2>/dev/null || true
+  /usr/bin/killall ColumnTamerMenu 2>/dev/null || true
+  /usr/bin/sudo -u "$CONSOLE_USER" /bin/launchctl bootstrap gui/$CONSOLE_UID "$HELPER_PLIST" &
+  /usr/bin/sudo -u "$CONSOLE_USER" /bin/launchctl bootstrap gui/$CONSOLE_UID "$MENU_PLIST" &
 fi
 
 # restart only if user agreed at preinstall prompt
@@ -108,7 +102,7 @@ if [[ -f "$FLAG" ]]; then
   rm -f "$FLAG"
 else
   if [[ -n "$CONSOLE_UID" ]]; then
-    /bin/launchctl asuser "$CONSOLE_UID" /usr/bin/sudo -u "$CONSOLE_USER" /usr/bin/osascript -e \
+    /usr/bin/sudo -u "$CONSOLE_USER" /usr/bin/osascript -e \
       'display notification "ColumnTamer installed. Restart Finder to activate." with title "ColumnTamer"' \
       2>/dev/null || true
   fi

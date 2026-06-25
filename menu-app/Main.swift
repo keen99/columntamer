@@ -82,19 +82,33 @@ enum CTDefaults {
 // ---- start-at-login LaunchAgent ---------------------------------------------
 
 enum CTLogin {
+    // We use enable/disable (toggle disabled flag), NOT bootout/bootstrap.
+    // bootout would kill THIS app (it IS the agent target). disable marks
+    // it "won't auto-load at login" while keeping the running instance alive.
     static var isEnabled: Bool {
-        let out = "/usr/bin/launchctl list \(loginAgentLabel) >/dev/null 2>&1"
-        return shellBool(out)
+        // print-disabled lists EVERY label with => enabled|disabled.
+        // disabled = won't load at login. enabled = will load.
+        let out = shellOut("/bin/launchctl print-disabled gui/\(getuid())")
+        // find our line, check it says enabled
+        for line in out.split(separator: "\n") {
+            if line.contains(loginAgentLabel) {
+                return line.contains("enabled") && !line.contains("disabled")
+            }
+        }
+        return false
     }
 
     static func enable() {
         let uid = getuid()
-        _ = shellBool("/bin/launchctl bootstrap gui/\(uid) \(loginAgentPlist)")
+        // ensure loaded first (bootstrap no-op if already loaded)
+        _ = shellBool("/bin/launchctl bootstrap gui/\(uid) \(loginAgentPlist) 2>/dev/null")
+        // enable flag. NO kickstart (would kill this running app).
+        _ = shellBool("/bin/launchctl enable gui/\(uid)/\(loginAgentLabel)")
     }
 
     static func disable() {
-        let uid = getuid()
-        _ = shellBool("/bin/launchctl bootout gui/\(uid)/\(loginAgentLabel)")
+        // disable, NOT bootout -> app keeps running, just won't relaunch at login
+        _ = shellBool("/bin/launchctl disable gui/\(getuid())/\(loginAgentLabel)")
     }
 
     @discardableResult
@@ -106,6 +120,18 @@ enum CTLogin {
         t.standardError = FileHandle(forWritingAtPath: "/dev/null")
         do { try t.run(); t.waitUntilExit() } catch { return false }
         return t.terminationStatus == 0
+    }
+
+    @discardableResult
+    static func shellOut(_ cmd: String) -> String {
+        let t = Process()
+        let p = Pipe()
+        t.launchPath = "/bin/zsh"
+        t.arguments = ["-c", cmd]
+        t.standardOutput = p
+        t.standardError = FileHandle(forWritingAtPath: "/dev/null")
+        do { try t.run(); t.waitUntilExit() } catch { return "" }
+        return String(data: p.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
     }
 }
 
