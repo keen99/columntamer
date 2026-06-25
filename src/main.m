@@ -31,6 +31,7 @@ static CGFloat  CTmrMinWidth = 240.0;
 static CGFloat  CTmrMaxWidth = 350.0;
 static BOOL     CTmrEnabled     = NO;
 static int      CTmrGuard       = 0;   // reentrancy guard
+static int      CTmrSwizzledCount = 0;  // how many methods hooked (H2 health)
 
 static void CTmrReload(void) {
     // Force disk-fresh read: menu app writes from another process.
@@ -161,6 +162,7 @@ static void CTmrSwizzleInstance(Class cls, SEL sel, IMP newImp, void **origOut) 
         } else {
             // save orig IMP from super, method now owned by cls with newImp.
             if (origOut) *origOut = (void *)method_getImplementation(superM);
+            CTmrSwizzledCount++;
             NSLog(@"[ColumnTamer] swizzled -[%@ %@] (added override, inherited from %@)",
                   NSStringFromClass(cls), NSStringFromSelector(sel),
                   NSStringFromClass(class_getSuperclass(cls)));
@@ -169,6 +171,7 @@ static void CTmrSwizzleInstance(Class cls, SEL sel, IMP newImp, void **origOut) 
     }
     if (origOut) *origOut = (void *)method_getImplementation(m);
     method_setImplementation(m, newImp);
+    CTmrSwizzledCount++;
     NSLog(@"[ColumnTamer] swizzled -[%@ %@]", NSStringFromClass(cls), NSStringFromSelector(sel));
 }
 
@@ -217,7 +220,19 @@ static void CTmrInstall(void) {
         CFSTR("com.local.columntamer.prefsChanged"), NULL,
         CFNotificationSuspensionBehaviorDeliverImmediately);
 
-    NSLog(@"[ColumnTamer] ENABLED, preview width clamp [%.0f, %.0f]", CTmrMinWidth, CTmrMaxWidth);
+    NSLog(@"[ColumnTamer] ENABLED, preview width clamp [%.0f, %.0f] (%d swizzles)",
+          CTmrMinWidth, CTmrMaxWidth, CTmrSwizzledCount);
+
+    // H2: broadcast health to menu app. Payload = swizzle count (expected 3).
+    // Menu app observes -> shows "Active". No ack = osax not loaded.
+    NSDictionary *info = @{@"swizzles": @(CTmrSwizzledCount),
+                           @"at": [NSDate date]};
+    CFNotificationCenterPostNotification(
+        CFNotificationCenterGetDistributedCenter(),
+        CFSTR("com.local.columntamer.health"),
+        NULL,
+        (__bridge CFDictionaryRef)info,
+        true);
 }
 
 // osax event handler (declared in Info.plist OSAXHandlers). No-op; load is what matters.

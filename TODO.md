@@ -30,14 +30,9 @@ Testing required before each commit. Check box when verified.
 
 ## 🟠 MEDIUM — installer hygiene
 
-- [ ] **M6: chown root:wheel on installed files**
-  - `build_pkg.sh`: chown in staging (`sudo chown -R root:wheel "$STAGE"`) or postinstall
-
-- [ ] **M7: Log dir 1777 symlink trap**
-  - `build_pkg.sh`: chmod 755 not 1777; per-user logs under ~/Library/Logs/ColumnTamer/ via $HOME
-
-- [ ] **M8: preinstall SystemUIServer activate may abort**
-  - `build_pkg.sh`: drop `tell application "SystemUIServer" to activate` line
+- [x] **M6: chown root:wheel on installed files** (f856d81)
+- [x] **M7: Log dir 1777 symlink trap** (f856d81)
+- [x] **M8: preinstall SystemUIServer activate may abort** (f856d81)
 
 ## 🟡 LOW — cleanup
 

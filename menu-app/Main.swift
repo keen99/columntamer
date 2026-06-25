@@ -29,6 +29,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var prefsController: PrefsController?
     // single-instance guard: hold lock file fd open for app lifetime
     private static var lockFD: Int32 = -1
+    // H2 health: last osax ack. nil = osax not loaded (no Finder inject yet).
+    private var lastHealth: Date? = nil
 
     func applicationDidFinishLaunching(_ n: Notification) {
         // single-instance check: try exclusive lock on sentinel
@@ -61,6 +63,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             nil,
             .deliverImmediately)
 
+        // H2: listen for osax health acks
+        CFNotificationCenterAddObserver(
+            CFNotificationCenterGetDistributedCenter(),
+            Unmanaged.passUnretained(self).toOpaque(),
+            { (_, observer, _, _, info) in
+                guard let observer = observer else { return }
+                let app = Unmanaged<AppDelegate>.fromOpaque(observer).takeUnretainedValue()
+                app.lastHealth = Date()
+                app.rebuildMenu()
+            },
+            "com.local.columntamer.health" as CFString,
+            nil,
+            .deliverImmediately)
+
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         // SF Symbol: 3-column Finder view. Template = adapts to menubar tint.
         let cfg = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
@@ -75,6 +91,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func rebuildMenu() {
         let menu = NSMenu()
         menu.addItem(withTitle: "ColumnTamer", action: nil, keyEquivalent: "").isEnabled = false
+        // H2: osax active state
+        let healthItem: NSMenuItem
+        if let h = lastHealth {
+            let age = Int(Date().timeIntervalSince(h))
+            let ageStr = age < 60 ? "\(age)s ago" : "\(age/60)m ago"
+            healthItem = NSMenuItem(title: "ColumnTamer: active (\(ageStr))", action: nil, keyEquivalent: "")
+        } else {
+            healthItem = NSMenuItem(title: "ColumnTamer: inactive (restart Finder)", action: #selector(restartFinder), keyEquivalent: "")
+            healthItem.target = self
+        }
+        healthItem.isEnabled = (lastHealth == nil)  // clickable only if inactive (to restart)
+        menu.addItem(healthItem)
         menu.addItem(.separator())
 
         let p = NSMenuItem(title: "Preferences…", action: #selector(showPrefs), keyEquivalent: ",")
@@ -93,6 +121,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             prefsController = PrefsController()
         }
         prefsController?.showWindow()
+    }
+
+    @objc func restartFinder() {
+        // user clicked inactive status -> restart Finder to trigger inject
+        let t = Process()
+        t.launchPath = "/usr/bin/killall"
+        t.arguments = ["Finder"]
+        try? t.run()
     }
 }
 
