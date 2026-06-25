@@ -144,6 +144,29 @@ static void CTmrSwizzleInstance(Class cls, SEL sel, IMP newImp, void **origOut) 
               NSStringFromClass(cls), NSStringFromSelector(sel));
         return;
     }
+    // Safety: if sel is inherited (not owned by cls), class_getInstanceMethod
+    // returns the SUPER's method and method_setImplementation would mutate it
+    // globally, breaking unrelated subclasses. Detect inheritance: if cls's own
+    // method table resolves to a different method pointer than super's, it's
+    // owned. Otherwise add an override on cls first, then swap that local copy.
+    Method superM = (class_getSuperclass(cls))
+                    ? class_getInstanceMethod(class_getSuperclass(cls), sel)
+                    : NULL;
+    if (superM == m) {
+        // inherited -> add override copy on cls so we don't touch super.
+        if (!class_addMethod(cls, sel, newImp, method_getTypeEncoding(m))) {
+            // lost a race or cls already overrides (shouldn't happen since
+            // superM==m); fall through and set on the cls-owned method.
+            m = class_getInstanceMethod(cls, sel);
+        } else {
+            // save orig IMP from super, method now owned by cls with newImp.
+            if (origOut) *origOut = (void *)method_getImplementation(superM);
+            NSLog(@"[ColumnTamer] swizzled -[%@ %@] (added override, inherited from %@)",
+                  NSStringFromClass(cls), NSStringFromSelector(sel),
+                  NSStringFromClass(class_getSuperclass(cls)));
+            return;
+        }
+    }
     if (origOut) *origOut = (void *)method_getImplementation(m);
     method_setImplementation(m, newImp);
     NSLog(@"[ColumnTamer] swizzled -[%@ %@]", NSStringFromClass(cls), NSStringFromSelector(sel));
