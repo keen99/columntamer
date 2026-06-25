@@ -87,20 +87,17 @@ enum CTDefaults {
 // ---- start-at-login LaunchAgent ---------------------------------------------
 
 enum CTLogin {
-    // We use enable/disable (toggle disabled flag), NOT bootout/bootstrap.
-    // bootout would kill THIS app (it IS the agent target). disable marks
-    // it "won't auto-load at login" while keeping the running instance alive.
+    // Source of truth = our own UserDefaults bool. launchctl enable/disable only
+    // ENACTS the decision; we never parse launchctl output back (format varies
+    // across macOS -> fragile). bootout would kill THIS app (it IS the agent
+    // target); disable keeps the running instance alive, just blocks login relaunch.
+    private static let key = "startAtLogin"
+    private static let ud = UserDefaults.standard
+
     static var isEnabled: Bool {
-        // print-disabled lists EVERY label with => enabled|disabled.
-        // disabled = won't load at login. enabled = will load.
-        let out = shellOut("/bin/launchctl print-disabled gui/\(getuid())")
-        // find our line, check it says enabled
-        for line in out.split(separator: "\n") {
-            if line.contains(loginAgentLabel) {
-                return line.contains("enabled") && !line.contains("disabled")
-            }
-        }
-        return false
+        // first-launch default: ON (postinstall bootstraps agent enabled)
+        if ud.object(forKey: key) == nil { return true }
+        return ud.bool(forKey: key)
     }
 
     static func enable() {
@@ -109,11 +106,13 @@ enum CTLogin {
         _ = shellBool("/bin/launchctl bootstrap gui/\(uid) \(loginAgentPlist) 2>/dev/null")
         // enable flag. NO kickstart (would kill this running app).
         _ = shellBool("/bin/launchctl enable gui/\(uid)/\(loginAgentLabel)")
+        ud.set(true, forKey: key)
     }
 
     static func disable() {
         // disable, NOT bootout -> app keeps running, just won't relaunch at login
         _ = shellBool("/bin/launchctl disable gui/\(getuid())/\(loginAgentLabel)")
+        ud.set(false, forKey: key)
     }
 
     @discardableResult
@@ -127,17 +126,6 @@ enum CTLogin {
         return t.terminationStatus == 0
     }
 
-    @discardableResult
-    static func shellOut(_ cmd: String) -> String {
-        let t = Process()
-        let p = Pipe()
-        t.launchPath = "/bin/zsh"
-        t.arguments = ["-c", cmd]
-        t.standardOutput = p
-        t.standardError = FileHandle(forWritingAtPath: "/dev/null")
-        do { try t.run(); t.waitUntilExit() } catch { return "" }
-        return String(data: p.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-    }
 }
 
 // ---- prefs window -----------------------------------------------------------

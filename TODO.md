@@ -4,7 +4,10 @@ Testing required before each commit. Check box when verified.
 
 ## 🔴 HIGH — headline feature risk
 
-- [ ] **H1: Stale NSUserDefaults cache**
+- [x] **H1: Stale NSUserDefaults cache** (06e0263)
+- [x] **M1: Safe swizzle on inherited methods** (652bbac)
+- [x] **M2: CTmrGuard stuck on throw** (693d0f9)
+- [x] **M3: launchctl print-disabled parse fragile** (pending commit)
   - `src/main.m` CTmrReload: add `CFPreferencesAppSynchronize(CFSTR("com.apple.finder"))` + `[ud synchronize]` before read
   - Test: change width in UI, Apply, verify Finder picks up immediately (no restart)
 
@@ -15,18 +18,6 @@ Testing required before each commit. Check box when verified.
   - Fix header comment `Main.swift:3` (still says killall Finder)
 
 ## 🟠 MEDIUM — correctness/stability
-
-- [ ] **M1: Safe swizzle on inherited methods**
-  - `src/main.m` CTmrSwizzleInstance: check if method owned by class; if inherited, `class_addMethod` override first
-  - Prevents `widthThatFits` mutating superclass = visual breakage
-
-- [ ] **M2: CTmrGuard stuck on throw**
-  - `src/main.m:89-91`: wrap orig call in `@try/@finally`, reset guard in finally
-  - Prevents clamp dying forever after one exception
-
-- [ ] **M3: launchctl print-disabled parse fragile**
-  - `menu-app/Main.swift` CTLogin: mirror state in own UserDefaults (`startAtLogin` bool) as source of truth
-  - launchctl enable/disable only enacts, never reads
 
 - [ ] **M4: Single-instance guard**
   - menu app: `applicationShouldHandleReopen` activate existing prefs, terminate late arrival
@@ -78,3 +69,16 @@ Testing required before each commit. Check box when verified.
 
 ## ✅ Verify not broken (skip unless regression)
 - bundle-ID guard, @try/@catch, idempotent install, 3 swizzles, sdef codes
+
+## 🔬 Future investigation
+
+- [ ] **Investigate breaking the ~240 preview-pane min-width floor**
+  - Empirically Finder won't shrink preview column below 240 (241 ok, 239 not)
+  - Mechanism unknown. Candidates to probe:
+    - `-[NSBrowser _validateNewWidthOfColumn:width:]` (swizzle? hard-floor 100 observed but real wall higher)
+    - `-[NSBrowser minColumnWidth]` / ivar `_minColumnWidth`
+    - preview VC intrinsic content size / `widthThatFits` floor inside AppKit
+    - Auto-layout constraints on preview VC view hierarchy
+    - `_calculateSizeToFitWidthOfColumn:testLoadedOnly:`
+  - If swizzling the validator lifts it, drop UI floor below 240
+  - Low priority: 240 usable for preview pane
