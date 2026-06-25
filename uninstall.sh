@@ -10,15 +10,19 @@ PLIST="/Library/LaunchAgents/com.local.columntamer.helper.plist"
 echo "=== stop LaunchAgent (current + legacy labels) ==="
 CONSOLE_USER="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || echo "$USER")"
 CONSOLE_UID="$(/usr/bin/id -u "$CONSOLE_USER")"
-for lbl in com.local.columntamer.helper com.local.xplock.helper com.local.xplock-reinject; do
+for lbl in com.local.columntamer.helper com.local.columntamer.menu com.local.xplock.helper com.local.xplock-reinject; do
   sudo launchctl bootout gui/$CONSOLE_UID/$lbl 2>/dev/null || true
 done
 for p in \
   /Library/LaunchAgents/com.local.columntamer.helper.plist \
+  /Library/LaunchAgents/com.local.columntamer.menu.plist \
   /Library/LaunchAgents/com.local.xplock.helper.plist \
   /Library/LaunchAgents/com.local.xplock-reinject.plist; do
   sudo launchctl bootout gui/$CONSOLE_UID "$p" 2>/dev/null || true
 done
+
+# quit menu app if running
+/usr/bin/killall ColumnTamerMenu 2>/dev/null || true
 
 echo "=== remove files ==="
 sudo rm -rf "$OSAX"
@@ -39,6 +43,8 @@ sudo pkgutil --forget com.local.columntamer 2>/dev/null || true
 sudo pkgutil --forget com.local.xplock 2>/dev/null || true
 
 echo "=== remove prefs (optional) ==="
+/usr/bin/defaults delete com.apple.finder ColumnTamerMinWidth 2>/dev/null || true
+/usr/bin/defaults delete com.apple.finder ColumnTamerMaxWidth 2>/dev/null || true
 /usr/bin/defaults delete com.apple.finder ColumnTamerPreviewWidth 2>/dev/null || true
 /usr/bin/defaults delete com.apple.finder XPLockPreviewWidth 2>/dev/null || true
 

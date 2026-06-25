@@ -1,17 +1,23 @@
-// CTmrock - lock Finder column view preview pane width.
+// ColumnTamer - clamp Finder column view preview pane width to min/max range.
 // Injected into Finder via osax. Constructor swizzles NSBrowser width setters
-// so the preview (last) column holds a fixed width instead of resizing chaos.
+// so the preview (last) column stays within [min, max] instead of resizing chaos.
 //
 // Targets (AppKit, verified via lldb image lookup):
 //   -[NSBrowser setWidth:ofColumn:]
 //   -[NSBrowser _setWidth:ofColumn:stretchWindow:]
 //   -[_NSBrowserPreviewColumnViewController widthThatFits]
 // Detection: +[NSBrowser previewColumnViewControllerClass] + -[NSBrowser _columnControllerInColumn:]
+//
+// Defaults (com.apple.finder domain):
+//   ColumnTamerMinWidth  (CGFloat, default 300)
+//   ColumnTamerMaxWidth  (CGFloat, default 400)
+//   if min == max -> fixed width; if min > max -> disabled (passthrough)
 
 #import <Cocoa/Cocoa.h>
 #import <objc/runtime.h>
 
-static CGFloat  CTmrLockedWidth = 320.0;
+static CGFloat  CTmrMinWidth = 300.0;
+static CGFloat  CTmrMaxWidth = 400.0;
 static BOOL     CTmrEnabled     = NO;
 static int      CTmrGuard       = 0;   // reentrancy guard
 
@@ -49,15 +55,26 @@ static BOOL CTmrIsPreviewColumn(NSBrowser *browser, NSInteger col) {
     }
 }
 
+// clamp incoming width to [min,max]; if min>max return original (disabled)
+static CGFloat CTmrClamp(CGFloat w) {
+    if (CTmrMinWidth > CTmrMaxWidth) return w;   // disabled
+    if (w < CTmrMinWidth) return CTmrMinWidth;
+    if (w > CTmrMaxWidth) return CTmrMaxWidth;
+    return w;
+}
+
 // ---- swizzled implementations ----------------------------------------------
 
 // -[NSBrowser setWidth:ofColumn:]
 static void xpl_setWidth_ofColumn(NSBrowser *self, SEL _cmd, CGFloat width, NSInteger col) {
     if (CTmrEnabled && CTmrGuard == 0 && CTmrIsPreviewColumn(self, col)) {
-        CTmrGuard = 1;
-        orig_setWidth_ofColumn(self, _cmd, CTmrLockedWidth, col);
-        CTmrGuard = 0;
-        return;
+        CGFloat cw = CTmrClamp(width);
+        if (cw != width) {
+            CTmrGuard = 1;
+            orig_setWidth_ofColumn(self, _cmd, cw, col);
+            CTmrGuard = 0;
+            return;
+        }
     }
     orig_setWidth_ofColumn(self, _cmd, width, col);
 }
@@ -66,14 +83,17 @@ static void xpl_setWidth_ofColumn(NSBrowser *self, SEL _cmd, CGFloat width, NSIn
 static void xpl_setWidth_ofColumn_stretch(NSBrowser *self, SEL _cmd,
                                           CGFloat width, NSInteger col, BOOL stretch) {
     if (CTmrEnabled && CTmrGuard == 0 && CTmrIsPreviewColumn(self, col)) {
-        width = CTmrLockedWidth;   // force, let original do layout w/ fixed width
+        width = CTmrClamp(width);
     }
     orig_setWidth_ofColumn_stretch(self, _cmd, width, col, stretch);
 }
 
 // -[_NSBrowserPreviewColumnViewController widthThatFits]
 static CGFloat xpl_widthThatFits(id self, SEL _cmd) {
-    if (CTmrEnabled) return CTmrLockedWidth;
+    if (CTmrEnabled) {
+        CGFloat w = orig_widthThatFits ? orig_widthThatFits(self, _cmd) : CTmrMinWidth;
+        return CTmrClamp(w);
+    }
     return orig_widthThatFits(self, _cmd);
 }
 
@@ -95,8 +115,10 @@ static void CTmrInstall(void) {
     if (CTmrEnabled) return;
 
     NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
-    CGFloat w = [ud floatForKey:@"ColumnTamerPreviewWidth"];
-    if (w >= 100.0 && w <= 2000.0) CTmrLockedWidth = w;
+    CGFloat mn = [ud floatForKey:@"ColumnTamerMinWidth"];
+    CGFloat mx = [ud floatForKey:@"ColumnTamerMaxWidth"];
+    if (mn >= 50.0  && mn <= 3000.0) CTmrMinWidth = mn;
+    if (mx >= 50.0  && mx <= 3000.0) CTmrMaxWidth = mx;
 
     Class browserClass = [NSBrowser class];
 
@@ -130,7 +152,7 @@ static void CTmrInstall(void) {
     }
 
     CTmrEnabled = YES;
-    NSLog(@"[ColumnTamer] ENABLED, locked preview width = %.0f", CTmrLockedWidth);
+    NSLog(@"[ColumnTamer] ENABLED, preview width clamp [%.0f, %.0f]", CTmrMinWidth, CTmrMaxWidth);
 }
 
 // osax event handler (declared in Info.plist OSAXHandlers). No-op; load is what matters.

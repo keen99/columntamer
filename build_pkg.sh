@@ -1,10 +1,12 @@
 #!/bin/zsh
-# Build ColumnTamer osax, then package as installable .pkg.
+# Build ColumnTamer osax + menu app, then package as installable .pkg.
 # System-wide layout (no user paths):
 #   /Library/ScriptingAdditions/ColumnTamer.osax
 #   /Library/Application Support/ColumnTamer/ColumnTamerHelper
+#   /Library/Application Support/ColumnTamer/ColumnTamerMenu.app
 #   /Library/Application Support/ColumnTamer/logs/
 #   /Library/LaunchAgents/com.local.columntamer.helper.plist
+#   /Library/LaunchAgents/com.local.columntamer.menu.plist
 set -eu
 
 cd "$(dirname "$0")"
@@ -18,6 +20,9 @@ PKG="$ROOT/build/ColumnTamer-$VERSION.pkg"
 echo "=== build osax first ==="
 "$ROOT/build.sh" >/dev/null
 
+echo "=== build menu app ==="
+"$ROOT/menu-app/build.sh" >/dev/null
+
 echo "=== stage payload ==="
 rm -rf "$STAGE" "$SCRIPTS" "$PKG"
 mkdir -p "$STAGE/Library/ScriptingAdditions" \
@@ -28,8 +33,12 @@ mkdir -p "$STAGE/Library/ScriptingAdditions" \
 cp -R "$ROOT/build/ColumnTamer.osax" "$STAGE/Library/ScriptingAdditions/ColumnTamer.osax"
 cp "$ROOT/ColumnTamerHelper"         "$STAGE/Library/Application Support/ColumnTamer/ColumnTamerHelper"
 chmod 755 "$STAGE/Library/Application Support/ColumnTamer/ColumnTamerHelper"
+cp -R "$ROOT/build/menubuild/ColumnTamerMenu.app" \
+   "$STAGE/Library/Application Support/ColumnTamer/ColumnTamerMenu.app"
 cp "$ROOT/com.local.columntamer.helper.plist" \
    "$STAGE/Library/LaunchAgents/com.local.columntamer.helper.plist"
+cp "$ROOT/com.local.columntamer.menu.plist" \
+   "$STAGE/Library/LaunchAgents/com.local.columntamer.menu.plist"
 
 echo "=== write postinstall ==="
 cat > "$SCRIPTS/preinstall" <<'PREINSTALL'
@@ -81,6 +90,13 @@ if [[ -n "$CONSOLE_UID" ]]; then
   /bin/launchctl bootstrap gui/$CONSOLE_UID "$PLIST"
   /bin/launchctl enable gui/$CONSOLE_UID/com.local.columntamer.helper
   /bin/launchctl kickstart -k gui/$CONSOLE_UID/com.local.columntamer.helper
+fi
+
+# launch menu app into user session (do NOT bootstrap as agent — it's an app; just open it).
+# Start-at-login controlled by user via prefs (toggles its own agent).
+if [[ -n "$CONSOLE_UID" ]]; then
+  /bin/launchctl asuser "$CONSOLE_UID" /usr/bin/sudo -u "$CONSOLE_USER" \
+    /usr/bin/open "/Library/Application Support/ColumnTamer/ColumnTamerMenu.app" 2>/dev/null || true
 fi
 
 # restart only if user agreed at preinstall prompt
