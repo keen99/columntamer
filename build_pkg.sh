@@ -92,11 +92,14 @@ if [[ -n "$CONSOLE_UID" ]]; then
   /bin/launchctl kickstart -k gui/$CONSOLE_UID/com.local.columntamer.helper
 fi
 
-# launch menu app into user session (do NOT bootstrap as agent — it's an app; just open it).
-# Start-at-login controlled by user via prefs (toggles its own agent).
+# launch menu app via its own LaunchAgent (launchd-managed).
+# Start-at-login checkbox reads launchctl list -> default ON after install.
+MENU_PLIST="/Library/LaunchAgents/com.local.columntamer.menu.plist"
 if [[ -n "$CONSOLE_UID" ]]; then
-  /bin/launchctl asuser "$CONSOLE_UID" /usr/bin/sudo -u "$CONSOLE_USER" \
-    /usr/bin/open "/Library/Application Support/ColumnTamer/ColumnTamerMenu.app" 2>/dev/null || true
+  /bin/launchctl bootout gui/$CONSOLE_UID "$MENU_PLIST" 2>/dev/null || true
+  /bin/launchctl bootstrap gui/$CONSOLE_UID "$MENU_PLIST"
+  /bin/launchctl enable gui/$CONSOLE_UID/com.local.columntamer.menu
+  /bin/launchctl kickstart -k gui/$CONSOLE_UID/com.local.columntamer.menu
 fi
 
 # restart only if user agreed at preinstall prompt

@@ -21,6 +21,22 @@ static CGFloat  CTmrMaxWidth = 400.0;
 static BOOL     CTmrEnabled     = NO;
 static int      CTmrGuard       = 0;   // reentrancy guard
 
+static void CTmrReload(void) {
+    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+    CGFloat mn = [ud floatForKey:@"ColumnTamerMinWidth"];
+    CGFloat mx = [ud floatForKey:@"ColumnTamerMaxWidth"];
+    if (mn >= 50.0  && mn <= 3000.0) CTmrMinWidth = mn;
+    if (mx >= 50.0  && mx <= 3000.0) CTmrMaxWidth = mx;
+    NSLog(@"[ColumnTamer] reload: clamp [%.0f, %.0f]", CTmrMinWidth, CTmrMaxWidth);
+}
+
+// distributed-notify callback (re-reads prefs live, no Finder restart)
+static void CTmrReloadCB(CFNotificationCenterRef center,
+                         void *observer, CFStringRef name,
+                         const void *object, CFDictionaryRef info) {
+    @autoreleasepool { CTmrReload(); }
+}
+
 // original IMPs
 static void   (*orig_setWidth_ofColumn)(id, SEL, CGFloat, NSInteger)            = NULL;
 static void   (*orig_setWidth_ofColumn_stretch)(id, SEL, CGFloat, NSInteger, BOOL) = NULL;
@@ -114,11 +130,7 @@ static void CTmrSwizzleInstance(Class cls, SEL sel, IMP newImp, void **origOut) 
 static void CTmrInstall(void) {
     if (CTmrEnabled) return;
 
-    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
-    CGFloat mn = [ud floatForKey:@"ColumnTamerMinWidth"];
-    CGFloat mx = [ud floatForKey:@"ColumnTamerMaxWidth"];
-    if (mn >= 50.0  && mn <= 3000.0) CTmrMinWidth = mn;
-    if (mx >= 50.0  && mx <= 3000.0) CTmrMaxWidth = mx;
+    CTmrReload();   // read prefs first time
 
     Class browserClass = [NSBrowser class];
 
@@ -152,6 +164,13 @@ static void CTmrInstall(void) {
     }
 
     CTmrEnabled = YES;
+
+    // listen for live pref changes from menu app (no Finder restart needed)
+    CFNotificationCenterAddObserver(
+        CFNotificationCenterGetDistributedCenter(), NULL, CTmrReloadCB,
+        CFSTR("com.local.columntamer.prefsChanged"), NULL,
+        CFNotificationSuspensionBehaviorDeliverImmediately);
+
     NSLog(@"[ColumnTamer] ENABLED, preview width clamp [%.0f, %.0f]", CTmrMinWidth, CTmrMaxWidth);
 }
 

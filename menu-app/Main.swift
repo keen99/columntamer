@@ -159,10 +159,10 @@ final class PrefsController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         statusLabel.font = .systemFont(ofSize: 10)
         statusLabel.textColor = .secondaryLabelColor
 
-        let applyBtn = NSButton(title: "Apply & Restart Finder",
+        let applyBtn = NSButton(title: "Apply",
                                 target: self, action: #selector(apply))
         applyBtn.bezelStyle = .rounded
-        applyBtn.keyEquivalent = "\r"
+        applyBtn.keyEquivalent = ""
 
         c.addArrangedSubview(title)
         c.addArrangedSubview(rowMin.view)
@@ -225,7 +225,11 @@ final class PrefsController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
             return
         }
         CTDefaults.write(min: mn, max: mx)
-        CTLogin.shellBool("/usr/bin/killall Finder")
-        statusLabel.stringValue = "Applied. Finder restarting…"
+        // post distributed notification -> osax re-reads prefs live, no Finder restart
+        CFNotificationCenterPostNotification(
+            CFNotificationCenterGetDistributedCenter(),
+            CFNotificationName("com.local.columntamer.prefsChanged" as CFString),
+            nil, nil, true)
+        statusLabel.stringValue = "Applied."
     }
 }
