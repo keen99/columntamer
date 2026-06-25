@@ -32,38 +32,67 @@ cp "$ROOT/com.local.columntamer.helper.plist" \
    "$STAGE/Library/LaunchAgents/com.local.columntamer.helper.plist"
 
 echo "=== write postinstall ==="
+cat > "$SCRIPTS/preinstall" <<'PREINSTALL'
+#!/bin/zsh
+# preinstall: ask user BEFORE install whether to restart Finder after.
+# Runs as root pre-payload. launchctl asuser reaches user's Aqua session.
+set -u
+
+FLAG="/tmp/.columntamer.restart-finder"
+rm -f "$FLAG" 2>/dev/null || true
+
+CONSOLE_USER="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
+CONSOLE_UID="$(/usr/bin/id -u "$CONSOLE_USER" 2>/dev/null || true)"
+[[ -z "$CONSOLE_UID" ]] && exit 0
+
+RESULT="$(/bin/launchctl asuser "$CONSOLE_UID" /usr/bin/sudo -u "$CONSOLE_USER" /usr/bin/osascript -e '
+  return button returned of (display dialog "ColumnTamer will be installed." & return & return & "Restart Finder afterward to activate?" with title "ColumnTamer" buttons {"Later", "Restart After Install"} default button "Restart After Install" with icon note)
+' 2>/dev/null || true)"
+
+if [[ "$RESULT" == *"Restart After Install"* ]]; then
+  /bin/echo "yes" > "$FLAG"
+fi
+
+exit 0
+PREINSTALL
+chmod 755 "$SCRIPTS/preinstall"
+
 cat > "$SCRIPTS/postinstall" <<'POSTINSTALL'
 #!/bin/zsh
-# postinstall: bootstrap LaunchAgent. Helper auto-injects on poll (~5s).
-# No osascript here — avoids TCC Automation prompt.
+# postinstall: bootstrap LaunchAgent + restart Finder if user agreed preinstall.
 set -e
 
 OSAX="/Library/ScriptingAdditions/ColumnTamer.osax"
 BIN="/Library/Application Support/ColumnTamer/ColumnTamerHelper"
 PLIST="/Library/LaunchAgents/com.local.columntamer.helper.plist"
 LOGDIR="/Library/Application Support/ColumnTamer/logs"
+FLAG="/tmp/.columntamer.restart-finder"
 
 chmod 755 "$BIN"
 mkdir -p "$LOGDIR"
 chmod 1777 "$LOGDIR"
 
 CONSOLE_USER="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
-if [[ -n "$CONSOLE_USER" ]]; then
-  CONSOLE_UID="$(/usr/bin/id -u "$CONSOLE_USER")"
+CONSOLE_UID="$(/usr/bin/id -u "$CONSOLE_USER" 2>/dev/null || true)"
+
+# bootstrap helper agent
+if [[ -n "$CONSOLE_UID" ]]; then
   /bin/launchctl bootout gui/$CONSOLE_UID "$PLIST" 2>/dev/null || true
   /bin/launchctl bootstrap gui/$CONSOLE_UID "$PLIST"
   /bin/launchctl enable gui/$CONSOLE_UID/com.local.columntamer.helper
   /bin/launchctl kickstart -k gui/$CONSOLE_UID/com.local.columntamer.helper
 fi
 
-# unattended: kill Finder so osax loads fresh + ColumnTamer activates now.
-# helper auto-injects on Finder relaunch (~5s). notify user.
-/usr/bin/killall Finder 2>/dev/null || true
-if [[ -n "$CONSOLE_USER" ]]; then
-  /bin/sleep 2
-  /usr/bin/sudo -u "$CONSOLE_USER" /usr/bin/osascript -e \
-    'display notification "ColumnTamer installed. Finder restarted to activate." with title "ColumnTamer"' \
-    2>/dev/null || true
+# restart only if user agreed at preinstall prompt
+if [[ -f "$FLAG" ]]; then
+  /usr/bin/killall Finder 2>/dev/null || true
+  rm -f "$FLAG"
+else
+  if [[ -n "$CONSOLE_UID" ]]; then
+    /bin/launchctl asuser "$CONSOLE_UID" /usr/bin/sudo -u "$CONSOLE_USER" /usr/bin/osascript -e \
+      'display notification "ColumnTamer installed. Restart Finder to activate." with title "ColumnTamer"' \
+      2>/dev/null || true
+  fi
 fi
 
 exit 0
