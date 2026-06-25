@@ -19,7 +19,8 @@ Testing required before each commit. Check box when verified.
 
 ## 🟠 MEDIUM — correctness/stability
 
-- [ ] **M4: Single-instance guard**
+- [x] **M4: Single-instance guard** (6a89a12)
+- [x] **M5: Apply upper bound 6000 enforced** (pending commit)
   - menu app: `applicationShouldHandleReopen` activate existing prefs, terminate late arrival
   - Named POSIXFileLock sentinel or distributed ping
 
@@ -66,6 +67,10 @@ Testing required before each commit. Check box when verified.
 
 - [ ] **L11: /tmp/.columntamer.restart-finder predictable**
   - move to root-owned path or mktemp
+
+- [ ] **Strip keyboard shortcuts from menu items**
+  - menubar app never has key focus (LSUIElement accessory)
+  - `Preferences…` cmd-, / `Quit` cmd-q never fire; misleading. Strip keyEquivalent.
 
 ## ✅ Verify not broken (skip unless regression)
 - bundle-ID guard, @try/@catch, idempotent install, 3 swizzles, sdef codes

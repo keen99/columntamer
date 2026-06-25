@@ -261,6 +261,14 @@ final class PrefsController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         loginBtn.state = CTLogin.isEnabled ? .on : .off
     }
 
+    // live filter: digits only. No range clamp live (rewriting stringValue
+    // resets cursor mid-type = typing fight). Range enforced on Apply.
+    func controlTextDidChange(_ n: Notification) {
+        guard let f = n.object as? NSTextField else { return }
+        let digits = f.stringValue.filter { $0.isNumber }
+        if digits != f.stringValue { f.stringValue = digits }
+    }
+
     @objc func toggleLogin() {
         if loginBtn.state == .on {
             CTLogin.enable()
