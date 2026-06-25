@@ -1,0 +1,35 @@
+#!/bin/zsh
+# Watch Finder PID. On change, send Apple Event that triggers XPLock osax load.
+# No sudo needed: osax in /Library/ScriptingAdditions auto-loads into target
+# process when the event arrives.
+set -u
+
+state_dir="${TMPDIR:-/tmp}"
+state_file="${state_dir}/xplock-reinject.finder.pid"
+
+log() { /bin/echo "$(/bin/date '+%Y-%m-%d %H:%M:%S') $*"; }
+
+log "watcher started"
+
+while true; do
+  finder_pid="$(/usr/bin/pgrep -x Finder | /usr/bin/head -n 1 || true)"
+
+  if [[ -n "${finder_pid}" ]]; then
+    last_pid=""
+    [[ -f "${state_file}" ]] && last_pid="$(/bin/cat "${state_file}" 2>/dev/null || true)"
+
+    if [[ "${finder_pid}" != "${last_pid}" ]]; then
+      log "Finder PID changed: ${last_pid:-none} -> ${finder_pid}; injecting XPLock"
+      /bin/echo "${finder_pid}" > "${state_file}"
+      /bin/sleep 2
+      # send inject event; osax loads + runs XPLInstall
+      if /usr/bin/osascript -e 'tell application "Finder" to inject' 2>/dev/null; then
+        log "XPLock inject event sent"
+      else
+        log "XPLock inject failed (osax missing or Finder busy)"
+      fi
+    fi
+  fi
+
+  /bin/sleep 5
+done

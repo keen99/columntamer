@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE dictionary SYSTEM "file://localhost/System/Library/DTDs/sdef.dtd">
+<dictionary>
+	<suite name="XPLock Suite" code="XPLk" description="XPLock Scripting Addition">
+		<command name="inject" code="XPLkIjct" description="Inject XPLock">
+		</command>
+	</suite>
+</dictionary>
