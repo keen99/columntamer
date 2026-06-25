@@ -9,8 +9,8 @@
 // Detection: +[NSBrowser previewColumnViewControllerClass] + -[NSBrowser _columnControllerInColumn:]
 //
 // Defaults (com.apple.finder domain):
-//   ColumnTamerMinWidth  (CGFloat, default 300)
-//   ColumnTamerMaxWidth  (CGFloat, default 400)
+//   ColumnTamerMinWidth  (CGFloat, default 240)
+//   ColumnTamerMaxWidth  (CGFloat, default 350)
 //   if min == max -> fixed width; if min > max -> disabled (passthrough)
 //
 // MINIMUM WIDTH LIMIT — practical floor is 240. Empirically tested:
@@ -20,14 +20,15 @@
 //   worth chasing; 240 is usable.
 //   We accept mn/mx >= 240 in code. Lower values rejected at UI.
 //
-// UPPER CAP 6000. Tested 3000 wide works (hard to verify wider visually).
-// No Finder rejection observed at 6000.
+// UPPER CAP 6000. Tested 6000 wide renders fine on this machine.
+// Higher probably safe but unverified. Lower cap would block future
+// ultra-wide/8K displays for no reason; keep headroom.
 
 #import <Cocoa/Cocoa.h>
 #import <objc/runtime.h>
 
-static CGFloat  CTmrMinWidth = 300.0;
-static CGFloat  CTmrMaxWidth = 400.0;
+static CGFloat  CTmrMinWidth = 240.0;
+static CGFloat  CTmrMaxWidth = 350.0;
 static BOOL     CTmrEnabled     = NO;
 static int      CTmrGuard       = 0;   // reentrancy guard
 
@@ -106,8 +107,11 @@ static void xpl_setWidth_ofColumn(NSBrowser *self, SEL _cmd, CGFloat width, NSIn
         CGFloat cw = CTmrClamp(width);
         if (cw != width) {
             CTmrGuard = 1;
-            orig_setWidth_ofColumn(self, _cmd, cw, col);
-            CTmrGuard = 0;
+            @try {
+                orig_setWidth_ofColumn(self, _cmd, cw, col);
+            } @finally {
+                CTmrGuard = 0;   // reset even if orig throws (else clamp dies forever)
+            }
             return;
         }
     }

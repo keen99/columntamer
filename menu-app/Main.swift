@@ -68,8 +68,8 @@ enum CTDefaults {
     static let minKey = "ColumnTamerMinWidth"
     static let maxKey = "ColumnTamerMaxWidth"
 
-    static func readMin() -> CGFloat { defaultsFloat(minKey, default: 300) }
-    static func readMax() -> CGFloat { defaultsFloat(maxKey, default: 400) }
+    static func readMin() -> CGFloat { defaultsFloat(minKey, default: 240) }
+    static func readMax() -> CGFloat { defaultsFloat(maxKey, default: 350) }
 
     static func write(min mn: CGFloat, max mx: CGFloat) {
         let d = UserDefaults(suiteName: domain) ?? UserDefaults.standard
