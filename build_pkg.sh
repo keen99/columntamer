@@ -54,6 +54,27 @@ CONSOLE_USER="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
 CONSOLE_UID="$(/usr/bin/id -u "$CONSOLE_USER" 2>/dev/null || true)"
 [[ -z "$CONSOLE_UID" ]] && exit 0
 
+# Detect GUI vs CLI install. GUI Installer.app in parent tree = interactive.
+# CLI `installer` (lowercase) = unattended → skip dialog, default restart Finder.
+is_gui_install() {
+  local pid=$$
+  while [[ "$pid" -gt 1 ]]; do
+    local name="$(/bin/ps -p "$pid" -o comm= 2>/dev/null)"
+    case "$name" in
+      *Installer.app*|*/Install) return 0;;
+    esac
+    pid="$(/bin/ps -p "$pid" -o ppid= 2>/dev/null | /usr/bin/tr -d ' ')"
+    [[ -z "$pid" ]] && break
+  done
+  return 1
+}
+
+if ! is_gui_install; then
+  # CLI install: no GUI to show dialog. Default: restart Finder.
+  /bin/echo "yes" > "$FLAG"
+  exit 0
+fi
+
 RESULT="$(/bin/launchctl asuser "$CONSOLE_UID" /usr/bin/sudo -u "$CONSOLE_USER" /usr/bin/osascript -e '
   tell application "SystemUIServer" to activate
   return button returned of (display dialog "ColumnTamer will be installed." & return & return & "Restart Finder afterward to activate?" with title "ColumnTamer" buttons {"Later", "Restart After Install"} default button "Restart After Install" with icon note giving up after 300)

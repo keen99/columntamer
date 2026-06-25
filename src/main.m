@@ -12,6 +12,16 @@
 //   ColumnTamerMinWidth  (CGFloat, default 300)
 //   ColumnTamerMaxWidth  (CGFloat, default 400)
 //   if min == max -> fixed width; if min > max -> disabled (passthrough)
+//
+// MINIMUM WIDTH LIMIT — practical floor is 240. Empirically tested:
+//   below 240 Finder won't shrink the preview column further (241 works,
+//   239 does not). Exact mechanism unknown — candidates are NSBrowser internal
+//   validator, preview VC intrinsic content size, layout constraints. Not
+//   worth chasing; 240 is usable.
+//   We accept mn/mx >= 240 in code. Lower values rejected at UI.
+//
+// UPPER CAP 6000. Tested 3000 wide works (hard to verify wider visually).
+// No Finder rejection observed at 6000.
 
 #import <Cocoa/Cocoa.h>
 #import <objc/runtime.h>
@@ -22,11 +32,19 @@ static BOOL     CTmrEnabled     = NO;
 static int      CTmrGuard       = 0;   // reentrancy guard
 
 static void CTmrReload(void) {
+    // Force disk-fresh read: menu app writes from another process.
+    // Without this, Finder's cached NSUserDefaults may be stale.
+    CFPreferencesAppSynchronize(CFSTR("com.apple.finder"));
     NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
-    CGFloat mn = [ud floatForKey:@"ColumnTamerMinWidth"];
-    CGFloat mx = [ud floatForKey:@"ColumnTamerMaxWidth"];
-    if (mn >= 50.0  && mn <= 3000.0) CTmrMinWidth = mn;
-    if (mx >= 50.0  && mx <= 3000.0) CTmrMaxWidth = mx;
+    [ud synchronize];
+    // CFPreferencesCopyAppValue bypasses the in-process cache.
+    CGFloat mn = 300.0, mx = 400.0;
+    CFNumberRef mnRef = CFPreferencesCopyAppValue(CFSTR("ColumnTamerMinWidth"), CFSTR("com.apple.finder"));
+    CFNumberRef mxRef = CFPreferencesCopyAppValue(CFSTR("ColumnTamerMaxWidth"), CFSTR("com.apple.finder"));
+    if (mnRef) { CFNumberGetValue(mnRef, kCFNumberCGFloatType, &mn); CFRelease(mnRef); }
+    if (mxRef) { CFNumberGetValue(mxRef, kCFNumberCGFloatType, &mx); CFRelease(mxRef); }
+    if (mn >= 240.0 && mn <= 6000.0) CTmrMinWidth = mn;
+    if (mx >= 240.0 && mx <= 6000.0) CTmrMaxWidth = mx;
     NSLog(@"[ColumnTamer] reload: clamp [%.0f, %.0f]", CTmrMinWidth, CTmrMaxWidth);
 }
 
@@ -71,7 +89,8 @@ static BOOL CTmrIsPreviewColumn(NSBrowser *browser, NSInteger col) {
     }
 }
 
-// clamp incoming width to [min,max]; if min>max return original (disabled)
+// clamp incoming width to [min,max]; if min>max return original (disabled).
+// NOTE: below 240 Finder won't shrink further (mechanism unknown). See header.
 static CGFloat CTmrClamp(CGFloat w) {
     if (CTmrMinWidth > CTmrMaxWidth) return w;   // disabled
     if (w < CTmrMinWidth) return CTmrMinWidth;

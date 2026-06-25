@@ -251,10 +251,12 @@ final class PrefsController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     @objc func apply() {
         let mn = CGFloat(minField.intValue)
         let mx = CGFloat(maxField.intValue)
-        guard mn >= 50, mx >= 50, mn <= mx else {
-            statusLabel.stringValue = "Need 50–3000, min ≤ max."
+        guard mn >= 240, mx >= 240, mn <= mx, mx <= 6000 else {
+            statusLabel.stringValue = "Need 240–6000, min ≤ max."
             return
         }
+        // No sub-floor warning needed: 240 is the hard limit below which Finder
+        // ignores the clamp (preview pane intrinsic width). Enforced here.
         CTDefaults.write(min: mn, max: mx)
         // post distributed notification -> osax re-reads prefs live, no Finder restart
         CFNotificationCenterPostNotification(
