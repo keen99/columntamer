@@ -26,8 +26,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var prefsController: PrefsController?
 
     func applicationDidFinishLaunching(_ n: Notification) {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.title = "▦"
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        // SF Symbol: 3-column Finder view. Template = adapts to menubar tint.
+        let cfg = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
+        let icon = NSImage(systemSymbolName: "rectangle.split.3x1", accessibilityDescription: "ColumnTamer")!
+        statusItem.button?.image = icon.withSymbolConfiguration(cfg)
+        statusItem.button?.image?.isTemplate = true
+        statusItem.button?.imagePosition = .imageOnly
         statusItem.button?.toolTip = "ColumnTamer"
         rebuildMenu()
     }
