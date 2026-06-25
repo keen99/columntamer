@@ -4,10 +4,13 @@
 // Start-at-login = manage its own LaunchAgent.
 
 import Cocoa
+import Darwin
 
 let appBundleID = "com.local.columntamer.menu"
 let loginAgentLabel = "com.local.columntamer.menu"
 let loginAgentPlist = "/Library/LaunchAgents/com.local.columntamer.menu.plist"
+// single-instance: named lock + activate notification
+let ctActivateNote = "com.local.columntamer.menu.activate"
 
 @main
 struct Main {
@@ -24,8 +27,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusItem: NSStatusItem!
     private var prefsController: PrefsController?
+    // single-instance guard: hold lock file fd open for app lifetime
+    private static var lockFD: Int32 = -1
 
     func applicationDidFinishLaunching(_ n: Notification) {
+        // single-instance check: try exclusive lock on sentinel
+        let sentinel = "/tmp/.columntamer.menu.lock"
+        let fd = open(sentinel, O_CREAT | O_RDWR, 0o644)
+        if fd >= 0 {
+            if flock(fd, LOCK_EX | LOCK_NB) == 0 {
+                AppDelegate.lockFD = fd   // hold open for lifetime
+            } else {
+                // another instance holds lock -> ping it to activate, then quit
+                CFNotificationCenterPostNotification(
+                    CFNotificationCenterGetDistributedCenter(),
+                    CFNotificationName(ctActivateNote as CFString),
+                    nil, nil, true)
+                NSApp.terminate(nil)
+                return
+            }
+        }
+
+        // listen for activate pings from late arrivals
+        CFNotificationCenterAddObserver(
+            CFNotificationCenterGetDistributedCenter(),
+            Unmanaged.passUnretained(self).toOpaque(),
+            { (_, observer, _, _, _) in
+                guard let observer = observer else { return }
+                let app = Unmanaged<AppDelegate>.fromOpaque(observer).takeUnretainedValue()
+                app.showPrefs()
+            },
+            ctActivateNote as CFString,
+            nil,
+            .deliverImmediately)
+
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         // SF Symbol: 3-column Finder view. Template = adapts to menubar tint.
         let cfg = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
