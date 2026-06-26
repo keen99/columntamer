@@ -15,7 +15,7 @@ build_arch() {
   echo "=== compile $arch ==="
   swiftc \
     -sdk "$(xcrun --sdk macosx --show-sdk-path)" \
-    -target ${arch}-apple-macosx11.0 \
+    -target ${arch}-apple-macosx10.15 \
     -parse-as-library \
     -o "$BUILD/ColumnTamerMenu.$arch" \
     "$ROOT/menu-app/Main.swift"

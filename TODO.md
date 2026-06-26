@@ -2,7 +2,15 @@
 
 Testing required before each commit. Check box when verified.
 
-## 🔴 HIGH — headline feature risk
+
+
+## 🔴 HIGH --- headline feature risk
+
+rename "com.local.columntamer" 
+to just "columntamer" everywhere
+
+osx 10.15 build target?
+
 
 - [x] **H1: Stale NSUserDefaults cache** (06e0263)
 - [x] **M1: Safe swizzle on inherited methods** (652bbac)
@@ -14,10 +22,10 @@ Testing required before each commit. Check box when verified.
 - [x] **H2: Apply reports success with no proof osax loaded** (feb065e)
   - Add health indicator: osax acks injection via reverse distributed notification → menu shows "Active"
   - OR: Apply falls back to killall Finder if no ack within timeout
-  - Make status label honest ("Applied — takes effect on next Finder launch" if not active)
+  - Make status label honest ("Applied --- takes effect on next Finder launch" if not active)
   - Fix header comment `Main.swift:3` (still says killall Finder)
 
-## 🟠 MEDIUM — correctness/stability
+## 🟠 MEDIUM --- correctness/stability
 
 - [x] **M4: Single-instance guard** (6a89a12)
 - [x] **M5: Apply upper bound 6000 enforced** (pending commit)
@@ -28,13 +36,13 @@ Testing required before each commit. Check box when verified.
   - `menu-app/Main.swift`: guard `mn <= 3000 && mx <= 3000`, clamp on controlTextDidChange
   - Wire up unused NSTextFieldDelegate conformance
 
-## 🟠 MEDIUM — installer hygiene
+## 🟠 MEDIUM --- installer hygiene
 
 - [x] **M6: chown root:wheel on installed files** (f856d81)
 - [x] **M7: Log dir 1777 symlink trap** (f856d81)
 - [x] **M8: preinstall SystemUIServer activate may abort** (f856d81)
 
-## 🟡 LOW — cleanup
+## 🟡 LOW --- cleanup
 
 - [ ] **L5: SF Symbol force-unwrap**
   - `menu-app/Main.swift:32`: `if let` with "CT" text fallback
@@ -65,7 +73,7 @@ Testing required before each commit. Check box when verified.
 
 - [ ] **Strip keyboard shortcuts from menu items**
   - menubar app never has key focus (LSUIElement accessory)
-  - `Preferences…` cmd-, / `Quit` cmd-q never fire; misleading. Strip keyEquivalent.
+  - `Preferences...` cmd-, / `Quit` cmd-q never fire; misleading. Strip keyEquivalent.
 
 ## ✅ Verify not broken (skip unless regression)
 - bundle-ID guard, @try/@catch, idempotent install, 3 swizzles, sdef codes

@@ -16,7 +16,7 @@ build_arch() {
   echo "=== compile $arch ==="
   clang -arch "$arch" -dynamiclib -fobjc-arc \
     -isysroot "$(xcrun --sdk macosx --show-sdk-path)" \
-    -mmacosx-version-min=11.0 \
+    -mmacosx-version-min=10.15 \
     -framework Cocoa -framework Foundation \
     -o "$BUILD/ColumnTamer.$arch.dylib" \
     "$ROOT/src/main.m"
