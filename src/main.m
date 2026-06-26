@@ -77,6 +77,19 @@ static Class CTmrPreviewClass(void) {
 
 static BOOL CTmrIsPreviewColumn(NSBrowser *browser, NSInteger col) {
     if (col < 0) return NO;
+    // M9 pre-filter: preview is always the LAST column. If col is not last,
+    // skip the expensive private-API probe. numberOfColumns is private (no
+    // header) -> resolve via runtime to avoid compile error. No cache (stale).
+    unsigned int (*imp)(id,SEL) = (unsigned int(*)(id,SEL))
+        [browser methodForSelector:@selector(numberOfColumns)];
+    if (imp) {
+        @try {
+            unsigned int last = imp(browser, @selector(numberOfColumns));
+            if (last > 0 && col != (NSInteger)last - 1) return NO;
+        } @catch (NSException *e) {
+            // transient; fall through to full probe
+        }
+    }
     Class pc = CTmrPreviewClass();
     if (!pc) return NO;
     if (!xpl_columnControllerInColumn) return NO;
