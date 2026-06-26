@@ -73,24 +73,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let app = Unmanaged<AppDelegate>.fromOpaque(observer).takeUnretainedValue()
                 app.lastHealth = Date()
                 AppDelegate.sharedHealth = app.lastHealth
-                app.rebuildMenu()
+                app.buildMenu()
             },
             "com.local.columntamer.health" as CFString,
             nil,
             .deliverImmediately)
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        // SF Symbol: 3-column Finder view. Template = adapts to menubar tint.
-        let cfg = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
-        let icon = NSImage(systemSymbolName: "rectangle.split.3x1", accessibilityDescription: "ColumnTamer")!
-        statusItem.button?.image = icon.withSymbolConfiguration(cfg)
+        // Draw icon in code (B): rounded rect + 2 dividers, matching
+        // rectangle.split.3x1. Template = adapts to menubar tint. No SF dep,
+        // no asset, works all macOS.
+        statusItem.button?.image = columnTamerIcon()
         statusItem.button?.image?.isTemplate = true
         statusItem.button?.imagePosition = .imageOnly
-        statusItem.button?.toolTip = "ColumnTamer"
-        rebuildMenu()
     }
 
-    private func rebuildMenu() {
+    // Landscape glyph matching SF rectangle.split.3x1 proportions.
+    private func columnTamerIcon() -> NSImage {
+        let w: CGFloat = 20, h: CGFloat = 14
+        let img = NSImage(size: NSSize(width: w, height: h))
+        img.lockFocus()
+        NSColor.black.setStroke()
+        NSColor.black.setFill()
+        let inset: CGFloat = 1.0
+        let lw: CGFloat = 1.5
+        let frame = NSRect(x: inset, y: inset,
+                           width: w - inset*2, height: h - inset*2)
+        let r = NSBezierPath(roundedRect: frame, xRadius: 2, yRadius: 2)
+        r.lineWidth = lw
+        r.stroke()
+        // 2 vertical dividers at thirds, thin for wide columns
+        let third = frame.width / 3
+        let x1 = frame.minX + third
+        let x2 = frame.minX + third * 2
+        let divW: CGFloat = 1.6
+        NSRect(x: x1 - divW/2, y: frame.minY, width: divW, height: frame.height).fill()
+        NSRect(x: x2 - divW/2, y: frame.minY, width: divW, height: frame.height).fill()
+        img.unlockFocus()
+        img.isTemplate = true
+        return img
+        statusItem.button?.toolTip = "ColumnTamer"
+        buildMenu()
+    }
+
+    private func buildMenu() {
         let menu = NSMenu()
         menu.addItem(withTitle: "ColumnTamer", action: nil, keyEquivalent: "").isEnabled = false
         // H2: osax active state
