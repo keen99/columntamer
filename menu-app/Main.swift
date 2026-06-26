@@ -31,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private static var lockFD: Int32 = -1
     // H2 health: last osax ack. nil = osax not loaded (no Finder inject yet).
     private var lastHealth: Date? = nil
+    static var sharedHealth: Date? = nil   // diagnostics reads this
 
     func applicationDidFinishLaunching(_ n: Notification) {
         // single-instance check: try exclusive lock on sentinel
@@ -71,6 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let observer = observer else { return }
                 let app = Unmanaged<AppDelegate>.fromOpaque(observer).takeUnretainedValue()
                 app.lastHealth = Date()
+                AppDelegate.sharedHealth = app.lastHealth
                 app.rebuildMenu()
             },
             "com.local.columntamer.health" as CFString,
@@ -105,9 +107,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(healthItem)
         menu.addItem(.separator())
 
-        let p = NSMenuItem(title: "Preferences…", action: #selector(showPrefs), keyEquivalent: ",")
+        let p = NSMenuItem(title: "Preferences…", action: #selector(showPrefs), keyEquivalent: "")
         p.target = self
         menu.addItem(p)
+
+        let d = NSMenuItem(title: "Diagnostics…", action: #selector(showDiagnostics), keyEquivalent: "")
+        d.target = self
+        menu.addItem(d)
 
         menu.addItem(.separator())
         let q = NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
@@ -121,6 +127,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             prefsController = PrefsController()
         }
         prefsController?.showWindow()
+    }
+
+    @objc func showDiagnostics() {
+        DiagnosticsController.shared.showWindow()
     }
 
     @objc func restartFinder() {
@@ -331,5 +341,163 @@ final class PrefsController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
             CFNotificationName("com.local.columntamer.prefsChanged" as CFString),
             nil, nil, true)
         statusLabel.stringValue = "Applied."
+    }
+}
+
+// ---- diagnostics window -----------------------------------------------------
+// Gathers system state for self-serve debugging when osax fails to load.
+
+final class DiagnosticsController: NSObject, NSWindowDelegate {
+
+    static let shared = DiagnosticsController()
+    private var window: NSWindow!
+    private var textView: NSTextView!
+    private var report = ""
+
+    func showWindow() {
+        if window == nil { build() }
+        gather()
+        NSApp.activate(ignoringOtherApps: true)
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    private func build() {
+        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 820, height: 600),
+                         styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                         backing: .buffered, defer: false)
+        w.title = "ColumnTamer Diagnostics"
+        w.delegate = self
+        w.isReleasedWhenClosed = false
+        window = w
+
+        let cv = w.contentView!
+
+        let scroll = NSScrollView()
+        scroll.hasVerticalScroller = true
+        scroll.hasHorizontalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.borderType = .bezelBorder
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        textView = NSTextView()
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        textView.maxSize = NSSize(width: 99999, height: 99999)
+        textView.autoresizingMask = [.width]
+        scroll.documentView = textView
+        cv.addSubview(scroll)
+
+        let row = NSView()
+        row.translatesAutoresizingMaskIntoConstraints = false
+        cv.addSubview(row)
+
+        let refreshBtn = NSButton(title: "Refresh", target: self, action: #selector(refresh))
+        refreshBtn.bezelStyle = .rounded
+        refreshBtn.translatesAutoresizingMaskIntoConstraints = false
+        let copyBtn = NSButton(title: "Copy to Clipboard", target: self, action: #selector(copyReport))
+        copyBtn.bezelStyle = .rounded
+        copyBtn.translatesAutoresizingMaskIntoConstraints = false
+        let saveBtn = NSButton(title: "Save…", target: self, action: #selector(saveReport))
+        saveBtn.bezelStyle = .rounded
+        saveBtn.translatesAutoresizingMaskIntoConstraints = false
+        row.addSubview(refreshBtn)
+        row.addSubview(copyBtn)
+        row.addSubview(saveBtn)
+
+        let btnH: CGFloat = 24, pad: CGFloat = 12, rowH: CGFloat = 36
+        NSLayoutConstraint.activate([
+            // scroll fills top, above button row
+            scroll.topAnchor.constraint(equalTo: cv.topAnchor, constant: pad),
+            scroll.leadingAnchor.constraint(equalTo: cv.leadingAnchor, constant: pad),
+            scroll.trailingAnchor.constraint(equalTo: cv.trailingAnchor, constant: -pad),
+            scroll.bottomAnchor.constraint(equalTo: row.topAnchor, constant: -pad),
+            // button row pinned to bottom
+            row.leadingAnchor.constraint(equalTo: cv.leadingAnchor, constant: pad),
+            row.trailingAnchor.constraint(equalTo: cv.trailingAnchor, constant: -pad),
+            row.bottomAnchor.constraint(equalTo: cv.bottomAnchor, constant: -pad),
+            row.heightAnchor.constraint(equalToConstant: rowH),
+            // buttons left-aligned in row, vertically centered
+            refreshBtn.leadingAnchor.constraint(equalTo: row.leadingAnchor),
+            refreshBtn.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+            copyBtn.leadingAnchor.constraint(equalTo: refreshBtn.trailingAnchor, constant: 8),
+            copyBtn.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+            saveBtn.leadingAnchor.constraint(equalTo: copyBtn.trailingAnchor, constant: 8),
+            saveBtn.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+        ])
+        _ = btnH
+    }
+
+    @objc func refresh() { gather() }
+
+    @objc func copyReport() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(report, forType: .string)
+    }
+
+    @objc func saveReport() {
+        let panel = NSSavePanel()
+        panel.title = "Save ColumnTamer Diagnostics"
+        panel.nameFieldStringValue = "ColumnTamer-diagnostics.txt"
+        if panel.runModal() == .OK, let url = panel.url {
+            try? report.write(to: url, atomically: true, encoding: .utf8)
+        }
+    }
+
+    private func shell(_ cmd: String) -> String {
+        let t = Process()
+        let p = Pipe()
+        t.launchPath = "/bin/zsh"
+        t.arguments = ["-c", cmd]
+        t.standardOutput = p
+        t.standardError = p
+        do { try t.run(); t.waitUntilExit() } catch { return "(error: \(error))" }
+        return String(data: p.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+    }
+
+    private func section(_ title: String) { report += "\n=== \(title) ===\n" }
+    private func kv(_ k: String, _ v: String) { report += "\(k): \(v)\n" }
+
+    private func gather() {
+        report = "ColumnTamer Diagnostics — \(Date())\n"
+
+        section("System")
+        kv("macOS", shell("sw_vers -productVersion").trimmingCharacters(in: .whitespacesAndNewlines))
+        kv("arch", shell("uname -m").trimmingCharacters(in: .whitespacesAndNewlines))
+
+        section("Security")
+        kv("SIP", shell("/usr/bin/csrutil status").trimmingCharacters(in: .whitespacesAndNewlines))
+        kv("boot-args", shell("/usr/sbin/nvram boot-args 2>/dev/null").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "(none)" : shell("/usr/sbin/nvram boot-args 2>/dev/null").trimmingCharacters(in: .whitespacesAndNewlines))
+
+        section("Osax")
+        let osax = "/Library/ScriptingAdditions/ColumnTamer.osax"
+        kv("path", osax)
+        let ls = shell("/bin/ls -ld \(osax) 2>&1").trimmingCharacters(in: .whitespacesAndNewlines)
+        kv("exists", ls.contains("No such") ? "NO" : "yes")
+        kv("stat", ls)
+        kv("codesign", shell("/usr/bin/codesign -dv \(osax) 2>&1").trimmingCharacters(in: .whitespacesAndNewlines))
+
+        section("Agents")
+        kv("helper", shell("/bin/launchctl list com.local.columntamer.helper 2>&1 | /usr/bin/head -5").trimmingCharacters(in: .whitespacesAndNewlines))
+        kv("menu", shell("/bin/launchctl list com.local.columntamer.menu 2>&1 | /usr/bin/head -5").trimmingCharacters(in: .whitespacesAndNewlines))
+        kv("helper log", "~/Library/Logs/ColumnTamer/ColumnTamerHelper.log")
+        kv("helper log tail", shell("/usr/bin/tail -20 ~/Library/Logs/ColumnTamer/ColumnTamerHelper.log 2>&1").trimmingCharacters(in: .whitespacesAndNewlines))
+
+        section("Finder")
+        kv("pid", shell("/usr/bin/pgrep -x Finder").trimmingCharacters(in: .whitespacesAndNewlines))
+        kv("ColumnTamer log (last 2m)", shell("/usr/bin/log show --predicate 'process==\"Finder\"' --last 2m 2>&1 | /usr/bin/grep ColumnTamer | /usr/bin/tail -20").trimmingCharacters(in: .whitespacesAndNewlines))
+
+        section("Health (menu app view)")
+        if let h = AppDelegate.sharedHealth {
+            kv("last osax ack", "\(h) (\(Int(Date().timeIntervalSince(h)))s ago)")
+        } else {
+            kv("last osax ack", "NEVER — osax not loaded or health not received")
+        }
+
+        section("Prefs")
+        kv("ColumnTamerMinWidth", shell("/usr/bin/defaults read com.apple.finder ColumnTamerMinWidth 2>&1").trimmingCharacters(in: .whitespacesAndNewlines))
+        kv("ColumnTamerMaxWidth", shell("/usr/bin/defaults read com.apple.finder ColumnTamerMaxWidth 2>&1").trimmingCharacters(in: .whitespacesAndNewlines))
+
+        textView.string = report
     }
 }

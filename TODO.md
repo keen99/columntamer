@@ -11,7 +11,7 @@ Testing required before each commit. Check box when verified.
   - `src/main.m` CTmrReload: add `CFPreferencesAppSynchronize(CFSTR("com.apple.finder"))` + `[ud synchronize]` before read
   - Test: change width in UI, Apply, verify Finder picks up immediately (no restart)
 
-- [ ] **H2: Apply reports success with no proof osax loaded**
+- [x] **H2: Apply reports success with no proof osax loaded** (feb065e)
   - Add health indicator: osax acks injection via reverse distributed notification → menu shows "Active"
   - OR: Apply falls back to killall Finder if no ack within timeout
   - Make status label honest ("Applied — takes effect on next Finder launch" if not active)
