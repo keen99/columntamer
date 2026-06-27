@@ -93,6 +93,12 @@ Standard across mailframe / ocular / columntamer. Same rules apply to future too
   cert exists. Ad-hoc dev builds silently break TCC (notifications, screen-rec,
   keychain consent cached forever).
 
+  **Dev signing uses `--timestamp=none`** (xcodebuild `OTHER_CODE_SIGN_FLAGS`,
+  codesign without `--timestamp`) — skips Apple secure-timestamp server
+  roundtrip (the slow part). TCC stability comes from cert identity
+  (TeamIdentifier), not timestamp. Timestamp only matters post-cert-expiry
+  (distribution concern) → release sets `SIGN_HARDEN=1` to re-enable.
+
   Release env vars (paid flow):
   ```bash
   export DEVELOPER_IDENTITY="Developer ID Application: Your Name (TEAMID)"

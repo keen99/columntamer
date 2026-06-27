@@ -4,7 +4,7 @@
 set -eu
 
 SIGN="${SIGN_IDENTITY:--}"
-if [[ -n "${SIGN_TEAM:-}" ]]; then
+if [[ "${SIGN_HARDEN:-}" == "1" ]]; then
   HARDSIGN=(-o runtime --timestamp)
 else
   HARDSIGN=()

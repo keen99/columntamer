@@ -30,6 +30,7 @@ else
 fi
 export SIGN_IDENTITY="$SIGN"
 export SIGN_TEAM
+export SIGN_HARDEN=1
 
 echo "▸ Building osax"
 "$ROOT/build.sh" >/dev/null
