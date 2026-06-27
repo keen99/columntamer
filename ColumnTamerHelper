@@ -15,21 +15,42 @@ log() { /bin/echo "$(/bin/date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG"; }
 log "ColumnTamerHelper started"
 
 last_pid=""
+# L13: exponential backoff on consecutive inject failures.
+# After MAX_FAILS, give up on that PID (Finder likely broken) and wait
+# for a new PID rather than spamming inject forever.
+MAX_FAILS=6
+fail_count=0
+backoff=5
 
 while true; do
   finder_pid="$(/usr/bin/pgrep -x Finder | /usr/bin/head -n 1 || true)"
 
-  if [[ -n "${finder_pid}" ]] && [[ "${finder_pid}" != "${last_pid}" ]]; then
+  if [[ -z "${finder_pid}" ]]; then
+    : # Finder not running, wait
+  elif [[ "${finder_pid}" != "${last_pid}" ]]; then
+    # new Finder PID -> reset backoff, attempt inject
+    fail_count=0
+    backoff=5
     log "Finder PID changed: ${last_pid:-none} -> ${finder_pid}; injecting ColumnTamer"
     /bin/sleep 2
     if /usr/bin/osascript -e 'tell application "Finder" to «event CTmrIjct»' 2>/dev/null; then
       log "ColumnTamer inject event sent"
       last_pid="${finder_pid}"
     else
-      log "ColumnTamer inject FAILED (osax load rejected or Finder busy)"
-      # leave last_pid unset so we retry next poll
+      fail_count=$((fail_count + 1))
+      log "ColumnTamer inject FAILED (${fail_count}/${MAX_FAILS})"
+      if (( fail_count >= MAX_FAILS )); then
+        log "ColumnTamer inject giving up on PID ${finder_pid} (Finder likely broken); waiting for new PID"
+        # pin last_pid to suppress retries on this PID; reset backoff for next
+        last_pid="${finder_pid}"
+        backoff=5
+        fail_count=0
+      else
+        backoff=$(( backoff * 2 ))
+        (( backoff > 60 )) && backoff=60
+      fi
     fi
   fi
 
-  /bin/sleep 5
+  /bin/sleep "${backoff}"
 done

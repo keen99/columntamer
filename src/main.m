@@ -107,6 +107,8 @@ static BOOL CTmrIsPreviewColumn(NSBrowser *browser, NSInteger col) {
 // clamp incoming width to [min,max]; if min>max return original (disabled).
 // NOTE: below 240 Finder won't shrink further (mechanism unknown). See header.
 static CGFloat CTmrClamp(CGFloat w) {
+    // L4: guard NaN. NaN fails all comparisons -> would fall through to return w.
+    if (w != w) return CTmrMinWidth;
     if (CTmrMinWidth > CTmrMaxWidth) return w;   // disabled
     if (w < CTmrMinWidth) return CTmrMinWidth;
     if (w > CTmrMaxWidth) return CTmrMaxWidth;
@@ -251,6 +253,25 @@ static void CTmrInstall(void) {
 // osax event handler (declared in Info.plist OSAXHandlers). No-op; load is what matters.
 OSStatus InjectHandler(const AppleEvent *ev, AppleEvent *reply, SRefCon refcon) {
     CTmrInstall();
+    // L10: report real status back to caller (helper). Text desc with
+    // enabled/min/max so helper can log/branch on outcome.
+    @try {
+        NSDictionary *status = @{
+            @"enabled": @(CTmrEnabled),
+            @"min": @(CTmrMinWidth),
+            @"max": @(CTmrMaxWidth),
+        };
+        if (reply) {
+            NSData *bytes = [[status description] dataUsingEncoding:NSUTF8StringEncoding];
+            AEDesc d = { typeNull, NULL };
+            if (AECreateDesc(typeUTF8Text, bytes.bytes, bytes.length, &d) == noErr) {
+                AEPutParamDesc(reply, keyDirectObject, &d);
+                AEDisposeDesc(&d);
+            }
+        }
+    } @catch (NSException *e) {
+        NSLog(@"[ColumnTamer] InjectHandler reply build failed: %@", e);
+    }
     return noErr;
 }
 

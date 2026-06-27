@@ -47,7 +47,7 @@ cat > "$SCRIPTS/preinstall" <<'PREINSTALL'
 # Runs as root pre-payload. launchctl asuser reaches user's Aqua session.
 set -u
 
-FLAG="/tmp/.columntamer.restart-finder"
+FLAG="/var/run/.columntamer.restart"
 rm -f "$FLAG" 2>/dev/null || true
 
 CONSOLE_USER="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
@@ -81,7 +81,7 @@ set -e
 BIN="/Library/Application Support/ColumnTamer/ColumnTamerHelper"
 HELPER_PLIST="/Library/LaunchAgents/com.local.columntamer.helper.plist"
 MENU_PLIST="/Library/LaunchAgents/com.local.columntamer.menu.plist"
-FLAG="/tmp/.columntamer.restart-finder"
+FLAG="/var/run/.columntamer.restart"
 
 chmod 755 "$BIN"
 
