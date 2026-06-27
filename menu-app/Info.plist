@@ -7,7 +7,7 @@
 	<key>CFBundleExecutable</key>
 	<string>ColumnTamerMenu</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.local.columntamer.menu</string>
+	<string>columntamer.menu</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -19,7 +19,7 @@
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>LSMinimumSystemVersion</key>
-	<string>11.0</string>
+	<string>10.15</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>LSBackgroundOnly</key>

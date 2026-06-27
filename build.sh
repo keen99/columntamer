@@ -1,6 +1,15 @@
 #!/bin/zsh
-# Build ColumnTamer osax. arm64 + arm64e. Ad-hoc signed (SIP off path).
+# Build ColumnTamer osax. arm64 + arm64e.
+# Signing identity via SIGN_IDENTITY env (default ad-hoc). Apple Dev preferred
+# for TCC stability — see AGENTS.md §Conventions.
 set -eu
+
+SIGN="${SIGN_IDENTITY:--}"
+if [[ -n "${SIGN_TEAM:-}" ]]; then
+  HARDSIGN=(-o runtime --timestamp)
+else
+  HARDSIGN=()
+fi
 
 cd "$(dirname "$0")"
 ROOT=$(pwd)
@@ -40,9 +49,9 @@ cp "$ROOT/ColumnTamer.sdef" "$BUNDLE/Contents/Resources/ColumnTamer.sdef"
 
 printf 'osax????' > "$BUNDLE/Contents/PkgInfo"
 
-echo "=== ad-hoc sign ==="
-codesign --force --sign - "$BUNDLE/Contents/MacOS/ColumnTamer"
-codesign --force --sign - "$BUNDLE"
+echo "=== sign: $SIGN ==="
+codesign --force --sign "$SIGN" "${HARDSIGN[@]}" "$BUNDLE/Contents/MacOS/ColumnTamer"
+codesign --force --sign "$SIGN" "${HARDSIGN[@]}" "$BUNDLE"
 
 echo "=== verify ==="
 file "$BUNDLE/Contents/MacOS/ColumnTamer"

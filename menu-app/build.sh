@@ -1,6 +1,14 @@
 #!/bin/zsh
-# Build ColumnTamerMenu menubar app. arm64 + arm64e. Ad-hoc signed.
+# Build ColumnTamerMenu menubar app. arm64 + arm64e.
+# Signing identity via SIGN_IDENTITY env (default ad-hoc). Apple Dev preferred.
 set -eu
+
+SIGN="${SIGN_IDENTITY:--}"
+if [[ -n "${SIGN_TEAM:-}" ]]; then
+  HARDSIGN=(-o runtime --timestamp)
+else
+  HARDSIGN=()
+fi
 cd "$(dirname "$0")"
 ROOT=$(pwd)/..
 BUILD="$ROOT/build/menubuild"
@@ -36,9 +44,9 @@ cp "$BUILD/ColumnTamerMenu"   "$APP/Contents/MacOS/ColumnTamerMenu"
 cp "$ROOT/menu-app/Info.plist" "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
-echo "=== sign ==="
-codesign --force --sign - "$APP/Contents/MacOS/ColumnTamerMenu"
-codesign --force --sign - "$APP"
+echo "=== sign: $SIGN ==="
+codesign --force --sign "$SIGN" "${HARDSIGN[@]}" "$APP/Contents/MacOS/ColumnTamerMenu"
+codesign --force --sign "$SIGN" "${HARDSIGN[@]}" "$APP"
 
 echo "=== verify ==="
 file "$APP/Contents/MacOS/ColumnTamerMenu"

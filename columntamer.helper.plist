@@ -4,14 +4,17 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.local.columntamer.menu</string>
+  <string>columntamer.helper</string>
+
   <key>ProgramArguments</key>
   <array>
-    <string>/Library/Application Support/ColumnTamer/ColumnTamerMenu.app/Contents/MacOS/ColumnTamerMenu</string>
+    <string>/Library/Application Support/ColumnTamer/ColumnTamerHelper</string>
   </array>
+
   <key>RunAtLoad</key>
   <true/>
+
   <key>KeepAlive</key>
-  <false/>
+  <true/>
 </dict>
 </plist>

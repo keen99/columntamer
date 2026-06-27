@@ -5,16 +5,17 @@
 #   /Library/Application Support/ColumnTamer/ColumnTamerHelper
 #   /Library/Application Support/ColumnTamer/ColumnTamerMenu.app
 #   /Library/Application Support/ColumnTamer/logs/
-#   /Library/LaunchAgents/com.local.columntamer.helper.plist
-#   /Library/LaunchAgents/com.local.columntamer.menu.plist
+#   /Library/LaunchAgents/columntamer.helper.plist
+#   /Library/LaunchAgents/columntamer.menu.plist
 set -eu
 
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 ROOT=$(pwd)
 STAGE="$ROOT/build/pkgroot"
 SCRIPTS="$ROOT/build/pkgscripts"
-IDENTIFIER="com.local.columntamer"
-VERSION="0.1.0"
+IDENTIFIER="columntamer"
+VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION")"
+BUILD_NUM="$(cd "$ROOT" && git rev-list --count HEAD 2>/dev/null || echo 1)"
 PKG="$ROOT/build/ColumnTamer-$VERSION.pkg"
 
 echo "=== build osax first ==="
@@ -35,10 +36,10 @@ cp "$ROOT/ColumnTamerHelper"         "$STAGE/Library/Application Support/ColumnT
 chmod 755 "$STAGE/Library/Application Support/ColumnTamer/ColumnTamerHelper"
 cp -R "$ROOT/build/menubuild/ColumnTamerMenu.app" \
    "$STAGE/Library/Application Support/ColumnTamer/ColumnTamerMenu.app"
-cp "$ROOT/com.local.columntamer.helper.plist" \
-   "$STAGE/Library/LaunchAgents/com.local.columntamer.helper.plist"
-cp "$ROOT/com.local.columntamer.menu.plist" \
-   "$STAGE/Library/LaunchAgents/com.local.columntamer.menu.plist"
+cp "$ROOT/columntamer.helper.plist" \
+   "$STAGE/Library/LaunchAgents/columntamer.helper.plist"
+cp "$ROOT/columntamer.menu.plist" \
+   "$STAGE/Library/LaunchAgents/columntamer.menu.plist"
 
 echo "=== write postinstall ==="
 cat > "$SCRIPTS/preinstall" <<'PREINSTALL'
@@ -79,8 +80,8 @@ cat > "$SCRIPTS/postinstall" <<'POSTINSTALL'
 set -e
 
 BIN="/Library/Application Support/ColumnTamer/ColumnTamerHelper"
-HELPER_PLIST="/Library/LaunchAgents/com.local.columntamer.helper.plist"
-MENU_PLIST="/Library/LaunchAgents/com.local.columntamer.menu.plist"
+HELPER_PLIST="/Library/LaunchAgents/columntamer.helper.plist"
+MENU_PLIST="/Library/LaunchAgents/columntamer.menu.plist"
 FLAG="/var/run/.columntamer.restart"
 
 chmod 755 "$BIN"
@@ -102,7 +103,7 @@ CONSOLE_UID="$(/usr/bin/id -u "$CONSOLE_USER" 2>/dev/null || true)"
 # bootstrap runs backgrounded so postinstall returns fast.
 if [[ -n "$CONSOLE_UID" ]]; then
   /usr/bin/sudo -u "$CONSOLE_USER" /bin/launchctl bootout gui/$CONSOLE_UID "$HELPER_PLIST" 2>/dev/null || true
-  /usr/bin/sudo -u "$CONSOLE_USER" /bin/launchctl bootout gui/$CONSOLE_UID/com.local.columntamer.menu 2>/dev/null || true
+  /usr/bin/sudo -u "$CONSOLE_USER" /bin/launchctl bootout gui/$CONSOLE_UID/columntamer.menu 2>/dev/null || true
   /usr/bin/sudo -u "$CONSOLE_USER" /bin/launchctl bootout gui/$CONSOLE_UID "$MENU_PLIST" 2>/dev/null || true
   /usr/bin/killall ColumnTamerMenu 2>/dev/null || true
   /usr/bin/sudo -u "$CONSOLE_USER" /bin/launchctl bootstrap gui/$CONSOLE_UID "$HELPER_PLIST" &

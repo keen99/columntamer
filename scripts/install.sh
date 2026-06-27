@@ -5,7 +5,7 @@ cd "$(dirname "$0")"
 
 OSAX="/Library/ScriptingAdditions/ColumnTamer.osax"
 APPROOT="/Library/Application Support/ColumnTamer"
-PLIST="/Library/LaunchAgents/com.local.columntamer.helper.plist"
+PLIST="/Library/LaunchAgents/columntamer.helper.plist"
 
 echo "=== install osax (sudo) ==="
 sudo -v
@@ -21,7 +21,7 @@ sudo chmod 755 "$APPROOT/ColumnTamerHelper"
 sudo chmod 1777 "$APPROOT/logs"
 
 echo "=== install launchagent ==="
-sudo cp com.local.columntamer.helper.plist "$PLIST"
+sudo cp columntamer.helper.plist "$PLIST"
 
 echo "=== validate ==="
 plutil -lint "$PLIST"
@@ -31,8 +31,8 @@ echo "=== bootstrap agent ==="
 UIDU="$(id -u)"
 launchctl bootout gui/$UIDU "$PLIST" 2>/dev/null || true
 sudo launchctl bootstrap gui/$UIDU "$PLIST"
-sudo launchctl enable gui/$UIDU/com.local.columntamer.helper
-sudo launchctl kickstart -k gui/$UIDU/com.local.columntamer.helper
+sudo launchctl enable gui/$UIDU/columntamer.helper
+sudo launchctl kickstart -k gui/$UIDU/columntamer.helper
 
 echo "=== initial inject ==="
 sleep 3

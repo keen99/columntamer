@@ -54,7 +54,7 @@ Helper watches Finder PID, auto-injects on Finder restart.
 ./uninstall.sh
 ```
 
-Removes everything (also cleans legacy `XPLock` artifacts from prior versions).
+Removes everything (sweeps legacy `com.local.columntamer` labels from pre-rename installs).
 
 ## Tune preview width
 

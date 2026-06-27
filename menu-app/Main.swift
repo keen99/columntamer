@@ -6,11 +6,11 @@
 import Cocoa
 import Darwin
 
-let appBundleID = "com.local.columntamer.menu"
-let loginAgentLabel = "com.local.columntamer.menu"
-let loginAgentPlist = "/Library/LaunchAgents/com.local.columntamer.menu.plist"
+let appBundleID = "columntamer.menu"
+let loginAgentLabel = "columntamer.menu"
+let loginAgentPlist = "/Library/LaunchAgents/columntamer.menu.plist"
 // single-instance: named lock + activate notification
-let ctActivateNote = "com.local.columntamer.menu.activate"
+let ctActivateNote = "columntamer.menu.activate"
 
 @main
 struct Main {
@@ -27,29 +27,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusItem: NSStatusItem!
     private var prefsController: PrefsController?
-    // single-instance guard: hold lock file fd open for app lifetime
-    private static var lockFD: Int32 = -1
     // H2 health: last osax ack. nil = osax not loaded (no Finder inject yet).
     private var lastHealth: Date? = nil
     static var sharedHealth: Date? = nil   // diagnostics reads this
 
     func applicationDidFinishLaunching(_ n: Notification) {
-        // single-instance check: try exclusive lock on sentinel
-        let sentinel = "/tmp/.columntamer.menu.lock"
-        let fd = open(sentinel, O_CREAT | O_RDWR, 0o644)
-        if fd >= 0 {
-            if flock(fd, LOCK_EX | LOCK_NB) == 0 {
-                AppDelegate.lockFD = fd   // hold open for lifetime
-            } else {
-                // another instance holds lock -> ping it to activate, then quit
-                CFNotificationCenterPostNotification(
-                    CFNotificationCenterGetDistributedCenter(),
-                    CFNotificationName(ctActivateNote as CFString),
-                    nil, nil, true)
-                NSApp.terminate(nil)
-                return
-            }
-        }
+        // Single-instance: rely on launchd Label (one per Label by design).
+        // Duplicate launch path (manual `open`) = rare; distributed ping below
+        // activates existing instance if it's listening.
 
         // listen for activate pings from late arrivals
         CFNotificationCenterAddObserver(
@@ -75,7 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 AppDelegate.sharedHealth = app.lastHealth
                 app.buildMenu()
             },
-            "com.local.columntamer.health" as CFString,
+            "columntamer.health" as CFString,
             nil,
             .deliverImmediately)
 
@@ -364,7 +349,7 @@ final class PrefsController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         // post distributed notification -> osax re-reads prefs live, no Finder restart
         CFNotificationCenterPostNotification(
             CFNotificationCenterGetDistributedCenter(),
-            CFNotificationName("com.local.columntamer.prefsChanged" as CFString),
+            CFNotificationName("columntamer.prefsChanged" as CFString),
             nil, nil, true)
         statusLabel.stringValue = "Applied."
     }
@@ -504,8 +489,8 @@ final class DiagnosticsController: NSObject, NSWindowDelegate {
         kv("codesign", shell("/usr/bin/codesign -dv \(osax) 2>&1").trimmingCharacters(in: .whitespacesAndNewlines))
 
         section("Agents")
-        kv("helper", shell("/bin/launchctl list com.local.columntamer.helper 2>&1 | /usr/bin/head -5").trimmingCharacters(in: .whitespacesAndNewlines))
-        kv("menu", shell("/bin/launchctl list com.local.columntamer.menu 2>&1 | /usr/bin/head -5").trimmingCharacters(in: .whitespacesAndNewlines))
+        kv("helper", shell("/bin/launchctl list columntamer.helper 2>&1 | /usr/bin/head -5").trimmingCharacters(in: .whitespacesAndNewlines))
+        kv("menu", shell("/bin/launchctl list columntamer.menu 2>&1 | /usr/bin/head -5").trimmingCharacters(in: .whitespacesAndNewlines))
         kv("helper log", "~/Library/Logs/ColumnTamer/ColumnTamerHelper.log")
         kv("helper log tail", shell("/usr/bin/tail -20 ~/Library/Logs/ColumnTamer/ColumnTamerHelper.log 2>&1").trimmingCharacters(in: .whitespacesAndNewlines))
 

@@ -232,7 +232,7 @@ static void CTmrInstall(void) {
     // listen for live pref changes from menu app (no Finder restart needed)
     CFNotificationCenterAddObserver(
         CFNotificationCenterGetDistributedCenter(), NULL, CTmrReloadCB,
-        CFSTR("com.local.columntamer.prefsChanged"), NULL,
+        CFSTR("columntamer.prefsChanged"), NULL,
         CFNotificationSuspensionBehaviorDeliverImmediately);
 
     NSLog(@"[ColumnTamer] ENABLED, preview width clamp [%.0f, %.0f] (%d swizzles)",
@@ -244,7 +244,7 @@ static void CTmrInstall(void) {
                            @"at": [NSDate date]};
     CFNotificationCenterPostNotification(
         CFNotificationCenterGetDistributedCenter(),
-        CFSTR("com.local.columntamer.health"),
+        CFSTR("columntamer.health"),
         NULL,
         (__bridge CFDictionaryRef)info,
         true);
