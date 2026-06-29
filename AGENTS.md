@@ -73,13 +73,12 @@ Standard across mailframe / ocular / columntamer. Same rules apply to future too
   `<product>.<role>` (e.g. `columntamer.helper`). UserDefaults domain = bundle ID
   (read via `Bundle.main.bundleIdentifier`, no hardcoded literal).
 
-- **macOS floor**: 10.15 goal. Exception only if required API forces higher —
-  document per-tool in TODO + AGENTS.md. (ocular 11.0: SF Symbols/UTType;
-  mailframe/columntamer 10.15.)
+- **macOS floor**: 10.15. Exception only if required API forces higher —
+  document per-tool in TODO + AGENTS.md. All current tools (mailframe, ocular,
+  columntamer) at 10.15.
 
-- **Universal binary**: `x86_64` + `arm64`. Intel + Apple Silicon both first-class.
-  (columntamer uses arm64 + arm64e — Apple Silicon osax requirement, not standard
-  universal.)
+- **Universal binary**: `x86_64` + `arm64` (+ `arm64e` for osax — Apple Silicon
+  kernel requires matching slice). Intel + Apple Silicon both first-class.
 
 - **Signing** — 3 flows, auto-pick best at build time:
 
