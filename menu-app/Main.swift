@@ -126,6 +126,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         d.target = self
         menu.addItem(d)
 
+        let a = NSMenuItem(title: "About ColumnTamer", action: #selector(showAbout), keyEquivalent: "")
+        a.target = self
+        menu.addItem(a)
+
         menu.addItem(.separator())
         let q = NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(q)
@@ -142,6 +146,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func showDiagnostics() {
         DiagnosticsController.shared.showWindow()
+    }
+
+    @objc func showAbout() {
+        AboutPanel.show()
     }
 
     @objc func restartFinder() {
@@ -510,5 +518,62 @@ final class DiagnosticsController: NSObject, NSWindowDelegate {
         kv("ColumnTamerMaxWidth", shell("/usr/bin/defaults read com.apple.finder ColumnTamerMaxWidth 2>&1").trimmingCharacters(in: .whitespacesAndNewlines))
 
         textView.string = report
+    }
+}
+
+// MARK: - About Panel
+enum AboutPanel {
+    static func show() {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        let commit = info?["GitCommit"] as? String ?? "dev"
+        let branch = info?["GitBranch"] as? String ?? "dev"
+        let date = info?["BuildDate"] as? String ?? "dev"
+
+        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 320, height: 220),
+                         styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        w.title = "About ColumnTamer"
+        w.center()
+
+        let stack = NSStackView()
+        stack.orientation = .vertical
+        stack.alignment = .centerX
+        stack.spacing = 6
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        w.contentView = stack
+        NSLayoutConstraint.activate([
+            stack.centerXAnchor.constraint(equalTo: w.contentView!.centerXAnchor),
+            stack.centerYAnchor.constraint(equalTo: w.contentView!.centerYAnchor),
+            stack.leadingAnchor.constraint(greaterThanOrEqualTo: w.contentView!.leadingAnchor, constant: 20),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: w.contentView!.trailingAnchor, constant: -20),
+        ])
+
+        let title = NSTextField(labelWithString: "ColumnTamer")
+        title.font = NSFont.boldSystemFont(ofSize: 22)
+        stack.addArrangedSubview(title)
+
+        func row(_ k: String, _ v: String) -> NSView {
+            let l = NSTextField(labelWithString: k)
+            l.font = NSFont.systemFont(ofSize: 11)
+            l.textColor = .secondaryLabelColor
+            l.alignment = .right
+            let r = NSTextField(labelWithString: v)
+            r.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+            let h = NSStackView(views: [l, r])
+            h.orientation = .horizontal
+            h.spacing = 8
+            return h
+        }
+        stack.addArrangedSubview(row("Version", version))
+        stack.addArrangedSubview(row("Build",   build))
+        stack.addArrangedSubview(row("Commit",  commit))
+        stack.addArrangedSubview(row("Branch",  branch))
+        stack.addArrangedSubview(row("Built",   date))
+
+        NSApp.activate(ignoringOtherApps: true)
+        let controller = NSWindowController(window: w)
+        controller.showWindow(nil)
+        w.makeKeyAndOrderFront(nil)
     }
 }
