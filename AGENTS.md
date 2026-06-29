@@ -115,7 +115,7 @@ Standard across mailframe / ocular / columntamer. Same rules apply to future too
   `show-sign`, `install-tools`, `uninstall`.
   - `release` = sign runnable artifacts. Never notarizes, never packages. Fast.
   - `package` = distribute (app-type: DMG; system-type: .pkg) + notarize+staple.
-    Requires `make release` first (app-type) or self-contained build (columntamer).
+    Chains release internally (app-type) or self-contained build (columntamer).
 
 - **Login items / LaunchAgents**: never wrap binary in `/bin/sh` (shows as "sh"
   in System Settings → Login Items). `ProgramArguments[0]` = Mach-O / .app

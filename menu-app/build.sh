@@ -1,20 +1,13 @@
 #!/bin/zsh
-# Build ColumnTamerMenu menubar app. arm64 + arm64e.
-# Signing identity via SIGN_IDENTITY env (default ad-hoc). Apple Dev preferred.
+# menu-app/build.sh — compile ColumnTamerMenu menubar app leaf (arm64 + arm64e).
+# UNSIGNED. Signing done by scripts/build.sh orchestrator (timed).
 set -eu
-
-SIGN="${SIGN_IDENTITY:--}"
-if [[ "${SIGN_HARDEN:-}" == "1" ]]; then
-  HARDSIGN=(-o runtime --timestamp)
-else
-  HARDSIGN=()
-fi
 cd "$(dirname "$0")"
 ROOT=$(pwd)/..
 BUILD="$ROOT/build/menubuild"
 APP="$BUILD/ColumnTamerMenu.app"
 
-echo "=== clean ==="
+echo "=== clean menu build ==="
 rm -rf "$BUILD"
 mkdir -p "$BUILD"
 
@@ -38,19 +31,11 @@ lipo -create \
   "$BUILD/ColumnTamerMenu.arm64e" \
   -output "$BUILD/ColumnTamerMenu"
 
-echo "=== bundle ==="
+echo "=== bundle (unsigned) ==="
 mkdir -p "$APP/Contents/MacOS"
 cp "$BUILD/ColumnTamerMenu"   "$APP/Contents/MacOS/ColumnTamerMenu"
 cp "$ROOT/menu-app/Info.plist" "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
-echo "=== sign: $SIGN ==="
-codesign --force --sign "$SIGN" "${HARDSIGN[@]}" "$APP/Contents/MacOS/ColumnTamerMenu"
-codesign --force --sign "$SIGN" "${HARDSIGN[@]}" "$APP"
-
-echo "=== verify ==="
-file "$APP/Contents/MacOS/ColumnTamerMenu"
-lipo -archs "$APP/Contents/MacOS/ColumnTamerMenu"
-codesign -dv "$APP" 2>&1 | grep -E "Identifier|Signature"
-echo "=== DONE ==="
+echo "=== DONE (unsigned) ==="
 echo "app: $APP"

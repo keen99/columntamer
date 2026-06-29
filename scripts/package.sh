@@ -1,7 +1,8 @@
 #!/bin/zsh
 #
-# package.sh — ColumnTamer pkg installer (builds + signs + notarizes).
-#   Called by `make package`. Smart-sign inside. Runs payload builder.
+# package.sh — ColumnTamer pkg installer (release + stage + notarize).
+#   Called by `make package`. Runs release.sh first (chain), then stages
+#   payload into .pkg (+notarize if DevID creds).
 #
 set -eu
 cd "$(dirname "$0")/.."
@@ -9,21 +10,9 @@ ROOT=$(pwd)
 
 PKG="$ROOT/scripts/package-payload.sh"
 
-# Smart-pick identity, export to payload builder.
-if [[ -n "${DEVELOPER_IDENTITY:-}" ]]; then
-  SIGN="$DEVELOPER_IDENTITY"
-  SIGN_TEAM="${APPLE_TEAM_ID:-}"
-elif security find-identity -v -p codesigning 2>/dev/null | grep -q "Apple Development"; then
-  SIGN="$(security find-identity -v -p codesigning | grep "Apple Development" | head -1 | sed 's/.*"\(.*\)".*/\1/')"
-  SIGN_TEAM="$(security find-certificate -c "Apple Development" -p 2>/dev/null \
-    | openssl x509 -noout -subject 2>/dev/null | grep -oE 'OU=[A-Z0-9]+' | cut -d= -f2)"
-else
-  SIGN="-"
-  SIGN_TEAM=""
-fi
-export SIGN_IDENTITY="$SIGN"
-export SIGN_TEAM
-export SIGN_HARDEN=1
+# Chain: build + sign Release first.
+echo "▸ release.sh →"
+scripts/release.sh >/dev/null
 
 # Decide notarize (pkg-level, after build).
 NOTARIZE=0
@@ -37,7 +26,7 @@ else
   echo "▸ Notarize: skipped (some creds unset). pkg unsigned — Gatekeeper warns for others."
 fi
 
-# Build payload + artifacts (signs osax/menu with SIGN_IDENTITY).
+# Stage signed artifacts into pkg (release.sh already signed).
 "$PKG"
 
 # Locate produced pkg.

@@ -1,22 +1,15 @@
 #!/bin/zsh
-# Build ColumnTamer osax. arm64 + arm64e.
-# Signing identity via SIGN_IDENTITY env (default ad-hoc). Apple Dev preferred
-# for TCC stability — see AGENTS.md §Conventions.
+# build-osax.sh — compile ColumnTamer osax leaf (x86_64 + arm64 + arm64e).
+# UNSIGNED. Signing done by scripts/build.sh orchestrator (timed).
+# Called by scripts/build.sh, scripts/release.sh, scripts/package.sh.
 set -eu
-
-SIGN="${SIGN_IDENTITY:--}"
-if [[ "${SIGN_HARDEN:-}" == "1" ]]; then
-  HARDSIGN=(-o runtime --timestamp)
-else
-  HARDSIGN=()
-fi
 
 cd "$(dirname "$0")"
 ROOT=$(pwd)
 BUILD="$ROOT/build"
 BUNDLE="$BUILD/ColumnTamer.osax"
 
-echo "=== clean ==="
+echo "=== clean osax build ==="
 rm -rf "$BUILD"
 mkdir -p "$BUILD"
 
@@ -31,16 +24,18 @@ build_arch() {
     "$ROOT/src/main.m"
 }
 
+build_arch x86_64
 build_arch arm64
 build_arch arm64e
 
 echo "=== lipo ==="
 lipo -create \
+  "$BUILD/ColumnTamer.x86_64.dylib" \
   "$BUILD/ColumnTamer.arm64.dylib" \
   "$BUILD/ColumnTamer.arm64e.dylib" \
   -output "$BUILD/ColumnTamer"
 
-echo "=== bundle ==="
+echo "=== bundle (unsigned) ==="
 mkdir -p "$BUNDLE/Contents/MacOS" \
          "$BUNDLE/Contents/Resources"
 cp "$BUILD/ColumnTamer"     "$BUNDLE/Contents/MacOS/ColumnTamer"
@@ -49,14 +44,5 @@ cp "$ROOT/ColumnTamer.sdef" "$BUNDLE/Contents/Resources/ColumnTamer.sdef"
 
 printf 'osax????' > "$BUNDLE/Contents/PkgInfo"
 
-echo "=== sign: $SIGN ==="
-codesign --force --sign "$SIGN" "${HARDSIGN[@]}" "$BUNDLE/Contents/MacOS/ColumnTamer"
-codesign --force --sign "$SIGN" "${HARDSIGN[@]}" "$BUNDLE"
-
-echo "=== verify ==="
-file "$BUNDLE/Contents/MacOS/ColumnTamer"
-lipo -archs "$BUNDLE/Contents/MacOS/ColumnTamer"
-codesign -dv "$BUNDLE" 2>&1 | grep -E "Identifier|Signature"
-
-echo "=== DONE ==="
+echo "=== DONE (unsigned) ==="
 echo "osax: $BUNDLE"

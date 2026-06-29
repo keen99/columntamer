@@ -18,12 +18,6 @@ VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION")"
 BUILD_NUM="$(cd "$ROOT" && git rev-list --count HEAD 2>/dev/null || echo 1)"
 PKG="$ROOT/build/ColumnTamer-$VERSION.pkg"
 
-echo "=== build osax first ==="
-"$ROOT/build.sh" >/dev/null
-
-echo "=== build menu app ==="
-"$ROOT/menu-app/build.sh" >/dev/null
-
 echo "=== stage payload ==="
 rm -rf "$STAGE" "$SCRIPTS" "$PKG"
 mkdir -p "$STAGE/Library/ScriptingAdditions" \

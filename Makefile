@@ -20,10 +20,10 @@ endif
 .PHONY: build run release package clean install-tools show-sign uninstall
 
 build:
-	scripts/dev.sh
+	scripts/build.sh
 
 run:
-	scripts/dev.sh --launch
+	scripts/run.sh
 
 release:
 	scripts/release.sh
