@@ -15,8 +15,9 @@ cd "$(dirname "$0")/.."
 ROOT=$(pwd)
 
 # ── Timestamper (FIFO: current shell, honest exit, flush on exit) ───────────
+SECONDS=0
 _FIFO=$(mktemp -u); mkfifo "$_FIFO"
-while IFS= read -r _l; do printf '[%s] %s\n' "$(date +%T)" "$_l"; done < "$_FIFO" &
+while IFS= read -r _l; do printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S') [${SECONDS}s]" "$_l"; done < "$_FIFO" &
 _TS_PID=$!
 _ts_cleanup() {
   exec >&- 2>&-            # close FIFO write end → reader hits EOF
