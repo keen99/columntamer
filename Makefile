@@ -19,17 +19,18 @@ endif
 
 .PHONY: build run release package clean install-tools show-sign uninstall
 
+# One core script, 4 doors. No chain.
 build:
-	scripts/build.sh
+	scripts/build.sh build
 
 run:
-	scripts/run.sh
+	scripts/build.sh run
 
 release:
-	scripts/release.sh
+	scripts/build.sh release
 
 package:
-	scripts/package.sh
+	scripts/build.sh package
 
 install:
 	sudo scripts/install.sh

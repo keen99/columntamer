@@ -1,0 +1,28 @@
+#!/bin/bash
+# preinstall: ask user BEFORE install whether to restart Finder after.
+# Runs as root pre-payload. launchctl asuser reaches user's Aqua session.
+set -u
+
+FLAG="/var/run/.columntamer.restart"
+rm -f "$FLAG" 2>/dev/null || true
+
+CONSOLE_USER="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
+CONSOLE_UID="$(/usr/bin/id -u "$CONSOLE_USER" 2>/dev/null || true)"
+[[ -z "$CONSOLE_UID" ]] && exit 0
+
+# Native installer context: COMMAND_LINE_INSTALL=1 -> CLI `installer` binary.
+# Unset -> GUI Installer.app. CLI = unattended: skip dialog, default restart.
+if [[ "${COMMAND_LINE_INSTALL:-0}" == "1" ]]; then
+  /bin/echo "yes" > "$FLAG"
+  exit 0
+fi
+
+RESULT="$(/usr/bin/launchctl asuser "$CONSOLE_UID" /usr/bin/sudo -u "$CONSOLE_USER" /usr/bin/osascript -e '
+  return button returned of (display dialog "ColumnTamer will be installed." & return & return & "Restart Finder afterward to activate?" with title "ColumnTamer" buttons {"Later", "Restart After Install"} default button "Restart After Install" with icon note giving up after 300)
+' 2>/dev/null || true)"
+
+if [[ "$RESULT" == *"Restart After Install"* ]]; then
+  /bin/echo "yes" > "$FLAG"
+fi
+
+exit 0

@@ -1,0 +1,48 @@
+#!/bin/bash
+# postinstall: bootstrap LaunchAgent + restart Finder if user agreed preinstall.
+set -e
+
+BIN="/Library/Application Support/ColumnTamer/ColumnTamerHelper"
+HELPER_PLIST="/Library/LaunchAgents/columntamer.helper.plist"
+MENU_PLIST="/Library/LaunchAgents/columntamer.menu.plist"
+FLAG="/var/run/.columntamer.restart"
+
+chmod 755 "$BIN"
+
+# M7: remove stale shared logdir from older installs (was 1777 symlink trap).
+# Logs now per-user at ~/Library/Logs/ColumnTamer/.
+rm -rf "/Library/Application Support/ColumnTamer/logs"
+
+# M6: pin ownership to root:wheel (installer runs as root; staged files
+# otherwise may carry dev-user ownership = persistence vector).
+chown -R root:wheel "/Library/ScriptingAdditions/ColumnTamer.osax"
+chown -R root:wheel "/Library/Application Support/ColumnTamer"
+chown root:wheel "$HELPER_PLIST" "$MENU_PLIST"
+
+CONSOLE_USER="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
+CONSOLE_UID="$(/usr/bin/id -u "$CONSOLE_USER" 2>/dev/null || true)"
+
+# bootstrap agents AS USER. RunAtLoad=true auto-launches; no kickstart (blocks).
+# bootstrap runs backgrounded so postinstall returns fast.
+if [[ -n "$CONSOLE_UID" ]]; then
+  /usr/bin/sudo -u "$CONSOLE_USER" /bin/launchctl bootout gui/$CONSOLE_UID "$HELPER_PLIST" 2>/dev/null || true
+  /usr/bin/sudo -u "$CONSOLE_USER" /bin/launchctl bootout gui/$CONSOLE_UID/columntamer.menu 2>/dev/null || true
+  /usr/bin/sudo -u "$CONSOLE_USER" /bin/launchctl bootout gui/$CONSOLE_UID "$MENU_PLIST" 2>/dev/null || true
+  /usr/bin/killall ColumnTamerMenu 2>/dev/null || true
+  /usr/bin/sudo -u "$CONSOLE_USER" /bin/launchctl bootstrap gui/$CONSOLE_UID "$HELPER_PLIST" &
+  /usr/bin/sudo -u "$CONSOLE_USER" /bin/launchctl bootstrap gui/$CONSOLE_UID "$MENU_PLIST" &
+fi
+
+# restart only if user agreed at preinstall prompt
+if [[ -f "$FLAG" ]]; then
+  /usr/bin/killall Finder 2>/dev/null || true
+  rm -f "$FLAG"
+else
+  if [[ -n "$CONSOLE_UID" ]]; then
+    /usr/bin/sudo -u "$CONSOLE_USER" /usr/bin/osascript -e \
+      'display notification "ColumnTamer installed. Restart Finder to activate." with title "ColumnTamer"' \
+      2>/dev/null || true
+  fi
+fi
+
+exit 0
