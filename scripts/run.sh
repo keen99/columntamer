@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 #
 # run.sh — ColumnTamer dev run. One command = test build end-to-end.
 #   Called by `make run`. Build Debug + dev-install osax + launch menu + inject.

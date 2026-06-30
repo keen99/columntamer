@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 # Uninstall ColumnTamer (osax + helper + menu app + LaunchAgents + logs + prefs).
 # Sweeps legacy `com.local.columntamer` labels (pre-rename installs).
 set -eu

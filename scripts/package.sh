@@ -1,4 +1,5 @@
-#!/bin/zsh
+#!/bin/bash
+(
 #
 # package.sh — ColumnTamer pkg installer (release + stage + notarize).
 #   Called by `make package`. Runs release.sh first (chain), then stages
@@ -58,3 +59,4 @@ else echo "   Unsigned pkg (not notarized)"; fi
 echo "   pkg: $PKGFILE"
 echo "   install: sudo installer -pkg \"$PKGFILE\" -target /"
 echo "══════════════════════════════════════════════════════════"
+)|timestamper

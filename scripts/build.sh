@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 #
 # build.sh — ColumnTamer build + sign orchestrator. Called by run.sh, release.sh.
 #   Usage: build.sh [Debug|Release]   (default Debug)

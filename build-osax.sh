@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 # build-osax.sh — compile ColumnTamer osax leaf (x86_64 + arm64 + arm64e).
 # UNSIGNED. Signing done by scripts/build.sh orchestrator (timed).
 # Called by scripts/build.sh, scripts/release.sh, scripts/package.sh.

@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 #
 # release.sh — ColumnTamer release. Build Release + smart-sign.
 #   Called by `make release`. Calls scripts/build.sh Release (timed).

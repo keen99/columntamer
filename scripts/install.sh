@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 # Local install (no pkg). For dev/testing. Same layout as the pkg.
 set -eu
 cd "$(dirname "$0")"

@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 # Test load ColumnTamer dylib into live Finder via lldb.
 set -eu
 DYLIB="$1"

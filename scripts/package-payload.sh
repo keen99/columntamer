@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 # Build ColumnTamer osax + menu app, then package as installable .pkg.
 # System-wide layout (no user paths):
 #   /Library/ScriptingAdditions/ColumnTamer.osax
