@@ -71,6 +71,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.button?.image = columnTamerIcon()
         statusItem.button?.image?.isTemplate = true
         statusItem.button?.imagePosition = .imageOnly
+        statusItem.button?.toolTip = "ColumnTamer"
+        buildMenu()
     }
 
     // Landscape glyph matching SF rectangle.split.3x1 proportions.
@@ -97,8 +99,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         img.unlockFocus()
         img.isTemplate = true
         return img
-        statusItem.button?.toolTip = "ColumnTamer"
-        buildMenu()
     }
 
     private func buildMenu() {
@@ -523,6 +523,8 @@ final class DiagnosticsController: NSObject, NSWindowDelegate {
 
 // MARK: - About Panel
 enum AboutPanel {
+    private static var retained: NSWindowController?
+
     static func show() {
         let info = Bundle.main.infoDictionary
         let version = info?["CFBundleShortVersionString"] as? String ?? "?"
@@ -572,8 +574,8 @@ enum AboutPanel {
         stack.addArrangedSubview(row("Built",   date))
 
         NSApp.activate(ignoringOtherApps: true)
-        let controller = NSWindowController(window: w)
-        controller.showWindow(nil)
+        retained = NSWindowController(window: w)
+        retained?.showWindow(nil)
         w.makeKeyAndOrderFront(nil)
     }
 }
