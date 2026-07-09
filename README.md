@@ -15,14 +15,14 @@ Injected into Finder as osax (Scripting Addition). Constructor swizzles:
 - `-[NSBrowserPreviewColumnViewController widthThatFits]`
 
 Preview column detected via `+[NSBrowser previewColumnViewControllerClass]`
-+ `-[NSBrowser _columnControllerInColumn:]` — no XtraFinder dependency.
++ `-[NSBrowser _columnControllerInColumn:]`
 
-Live pref reload via distributed notification — no Finder restart needed after changing width.
+Live pref reload via distributed notification --- no Finder restart needed after changing width.
 
 ## Requirements
 
-- macOS 10.15+ (tested on 10.15 Catalina + Sonoma 14.8, arm64 + arm64e)
-- **SIP off** — required for unsigned scripting addition loading into Finder.
+- macOS 10.15+ (built/tested on Sonoma 14.8, arm64 + arm64e)
+- **SIP off** --- required for unsigned scripting addition loading into Finder.
   - Apple Dev / Developer ID signed osax works with SIP off alone.
   - Ad-hoc/unsigned builds may need `amfi_get_out_of_my_way=1` boot-arg additionally.
   - Apple will not notarize Finder osax injection.
@@ -30,7 +30,7 @@ Live pref reload via distributed notification — no Finder restart needed after
 
 ## Build
 
-Use `make` (thin router — all logic in `scripts/`):
+Use `make` (thin router --- all logic in `scripts/`):
 
 ```bash
 make build      # osax + menu app (Debug, signed)
@@ -44,7 +44,7 @@ See `AGENTS.md` for full build/install/uninstall docs.
 **Note on `make package` vs `make devinstall`:** PackageKit relocates `.app`
 bundles when matching CFBundleIdentifier exists on disk (e.g., from a prior
 build). `make package` deletes staging dir after building to prevent this.
-`make devinstall` bypasses PackageKit entirely via direct file copy — use
+`make devinstall` bypasses PackageKit entirely via direct file copy --- use
 for day-to-day development.
 
 ## Install
@@ -78,11 +78,11 @@ Via menu app Preferences or:
 ```bash
 defaults write com.apple.finder ColumnTamerMinWidth -float 300
 defaults write com.apple.finder ColumnTamerMaxWidth -float 500
-# no Finder restart needed — osax re-reads prefs live
+# no Finder restart needed --- osax re-reads prefs live
 ```
 
 Defaults: min=240, max=350 (300/400 after first run via CTmrReload).
-Valid range: 240–6000.
+Valid range: 240--6000.
 Set both equal for fixed width. Set min > max to disable clamping (passthrough).
 
 ## Status
