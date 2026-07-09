@@ -21,7 +21,7 @@ Live pref reload via distributed notification — no Finder restart needed after
 
 ## Requirements
 
-- macOS 10.15+ (built/tested on Sonoma 14.8, arm64 + arm64e)
+- macOS 10.15+ (tested on 10.15 Catalina + Sonoma 14.8, arm64 + arm64e)
 - **SIP off** — required for unsigned scripting addition loading into Finder.
   - Apple Dev / Developer ID signed osax works with SIP off alone.
   - Ad-hoc/unsigned builds may need `amfi_get_out_of_my_way=1` boot-arg additionally.
