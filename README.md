@@ -27,6 +27,38 @@ Live pref reload via distributed notification --- no Finder restart needed after
   - Apple will not notarize Finder osax injection.
   - Target audience = existing XtraFinder users (already SIP off).
 
+
+[![Latest release](https://img.shields.io/github/v/release/keen99/columntamer)](https://github.com/keen99/columntamer/releases/latest)
+
+### Install from Release
+
+Download the `.pkg` from the [latest release](https://github.com/keen99/columntamer/releases/latest).
+The package is not notarized, so Gatekeeper will warn on first open.
+
+**Option A --- Terminal (most reliable):**
+```bash
+sudo installer -pkg ColumnTamer-*.pkg -target /
+```
+This bypasses Gatekeeper entirely. You will be prompted for your password.
+
+**Option B --- GUI with right-click open:**
+1. Right-click `ColumnTamer-*.pkg` → Open
+2. Click Install. If Gatekeeper still blocks, run:
+   ```bash
+   xattr -cr ColumnTamer-*.pkg
+   ```
+   Then double-click normally.
+
+**Option C --- System Settings:**
+If both above fail, go to System Settings → Privacy & Security and click "Open Anyway" next to the blocked package.
+
+Restart Finder after installation if it did not restart automatically (the installer may prompt you). The osax loads when Finder launches.
+
+Restart Finder:
+  **Terminal:** `killall Finder`
+  **GUI:** Hold Option/Alt or right-click Finder icon in Dock → Relaunch
+
+
 ## Build
 
 Use `make` (thin router --- all logic in `scripts/`):
@@ -86,7 +118,8 @@ Set both equal for fixed width. Set min > max to disable clamping (passthrough).
 
 ## Status
 
-Stable preview-lock. Tested on 10.15 Catalina + Sonoma 14.8. Not packaged for public distribution yet.
+Stable preview-lock. Tested on 10.15 Catalina + Sonoma 14.8.
+
 
 ## License
 
