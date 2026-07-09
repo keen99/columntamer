@@ -85,22 +85,6 @@ Defaults: min=240, max=350 (300/400 after first run via CTmrReload).
 Valid range: 240–6000.
 Set both equal for fixed width. Set min > max to disable clamping (passthrough).
 
-## Files
-
-- `src/main.m` — swizzle logic
-- `menu-app/Main.swift` — menubar app (status item, prefs, diagnostics, about)
-- `build-osax.sh` — compile osax leaf (x86_64 + arm64 + arm64e)
-- `menu-app/build.sh` — compile menu leaf (arm64 + arm64e)
-- `scripts/build.sh` — orchestrator (4 doors: build/run/release/package)
-- `scripts/devinstall.sh` — dev install (sudo)
-- `scripts/uninstall.sh` — full removal (sudo)
-- `scripts/pkg-scripts/{preinstall,postinstall}` — pkg installer hooks
-- `ColumnTamerHelper` — Finder PID watcher script (zsh)
-- `columntamer.{helper,menu}.plist` — LaunchAgent plists
-- `AGENTS.md` — conventions, signing flows, project layout
-- `test_inject.sh` — manual dlopen test via lldb (dev only)
-- `VERSION` — single source of truth
-
 ## Status
 
 Stable preview-lock. Tested on Sonoma 14.8. Not packaged for public distribution yet.
