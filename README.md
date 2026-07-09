@@ -14,8 +14,7 @@ Injected into Finder as osax (Scripting Addition). Constructor swizzles:
 - `-[NSBrowser _setWidth:ofColumn:stretchWindow:]`
 - `-[NSBrowserPreviewColumnViewController widthThatFits]`
 
-Preview column detected via `+[NSBrowser previewColumnViewControllerClass]`
-+ `-[NSBrowser _columnControllerInColumn:]`
+Preview column detected via `+[NSBrowser previewColumnViewControllerClass]` and `-[NSBrowser _columnControllerInColumn:]`
 
 Live pref reload via distributed notification --- no Finder restart needed after changing width.
 
