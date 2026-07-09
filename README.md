@@ -1,14 +1,14 @@
 # ColumnTamer
 
-Fix macOS Finder column-view column behavior. Currently: **locks the preview pane** to a fixed width, stopping the erratic resize that pushes file columns off-screen. 11+ year Apple bug, unfixed through macOS Tahoe.
+Fix macOS Finder column-view column behavior. Currently: **locks the preview pane** to a fixed width, stopping erratic resize that pushes file columns off-screen. 11+ year Apple bug, unfixed through macOS Tahoe.
 
 Planned: column width resizing (eventually replace XtraFinder's feature for users who don't need other XF features).
 
-`XtraFinder` fixes file-column width but **skips the preview pane by design**. ColumnTamer closes that gap by swizzling AppKit's `NSBrowser` width setters.
+`XtraFinder` fixes file-column width but **skips preview pane by design**. ColumnTamer closes gap by swizzling AppKit's `NSBrowser` width setters.
 
 ## How it works
 
-Injected into Finder as an osax (Scripting Addition). Constructor swizzles:
+Injected into Finder as osax (Scripting Addition). Constructor swizzles:
 
 - `-[NSBrowser setWidth:ofColumn:]`
 - `-[NSBrowser _setWidth:ofColumn:stretchWindow:]`
@@ -17,69 +17,88 @@ Injected into Finder as an osax (Scripting Addition). Constructor swizzles:
 Preview column detected via `+[NSBrowser previewColumnViewControllerClass]`
 + `-[NSBrowser _columnControllerInColumn:]` — no XtraFinder dependency.
 
+Live pref reload via distributed notification — no Finder restart needed after changing width.
+
 ## Requirements
 
-- macOS 11.0+ (built/tested on Sonoma 14.8, arm64 + arm64e)
-- **SIP off** + AMFI library validation disabled
-  - Same requirement as XtraFinder. AMFI blocks unsigned dylib load into Apple
-    processes when SIP is on. Apple will not notarize Finder osax injection.
+- macOS 10.15+ (built/tested on Sonoma 14.8, arm64 + arm64e)
+- **SIP off** — required for unsigned scripting addition loading into Finder.
+  - Apple Dev / Developer ID signed osax works with SIP off alone.
+  - Ad-hoc/unsigned builds may need `amfi_get_out_of_my_way=1` boot-arg additionally.
+  - Apple will not notarize Finder osax injection.
   - Target audience = existing XtraFinder users (already SIP off).
 
 ## Build
 
+Use `make` (thin router — all logic in `scripts/`):
+
 ```bash
-./build.sh        # osax only
-./build_pkg.sh    # osax + .pkg installer
+make build      # osax + menu app (Debug, signed)
+make run        # build + inject into running Finder
+make release    # Release build, signed artifacts
+make package    # Release + .pkg installer (+notarize if DevID creds)
 ```
 
-Produces `build/ColumnTamer.osax` and `build/ColumnTamer-0.1.0.pkg`
-(universal arm64 + arm64e, ad-hoc signed).
+See `AGENTS.md` for full build/install/uninstall docs.
 
 ## Install
 
 ```bash
-sudo installer -pkg build/ColumnTamer-0.1.0.pkg -target /
+make devinstall       # sudo dev install
+# or via pkg:
+sudo installer -pkg build/ColumnTamer-$VERSION.pkg -target /
 ```
 
 Installs:
 - osax → `/Library/ScriptingAdditions/ColumnTamer.osax`
 - helper → `/Library/Application Support/ColumnTamer/ColumnTamerHelper`
-- LaunchAgent → `/Library/LaunchAgents/com.local.columntamer.helper.plist`
+- menu app → `/Library/Application Support/ColumnTamer/ColumnTamerMenu.app`
+- LaunchAgents → `/Library/LaunchAgents/columntamer.{helper,menu}.plist`
 
-Helper watches Finder PID, auto-injects on Finder restart.
+Helper watches Finder PID, auto-injects. Menu app provides prefs panel + health indicator.
 
 ## Uninstall
 
 ```bash
-./uninstall.sh
+make uninstall
 ```
 
-Removes everything (sweeps legacy `com.local.columntamer` labels from pre-rename installs).
+Removes everything (sweeps legacy `com.local.columntamer*` labels from pre-rename installs). Kills Finder at end to unload osax from RAM.
 
 ## Tune preview width
 
+Via menu app Preferences or:
+
 ```bash
-defaults write com.apple.finder ColumnTamerPreviewWidth -float 400
-killall Finder
+defaults write com.apple.finder ColumnTamerMinWidth -float 300
+defaults write com.apple.finder ColumnTamerMaxWidth -float 500
+# no Finder restart needed — osax re-reads prefs live
 ```
 
-Default width: 320px. Valid range: 100–2000px.
+Defaults: min=240, max=350 (300/400 after first run via CTmrReload).
+Valid range: 240–6000.
+Set both equal for fixed width. Set min > max to disable clamping (passthrough).
 
 ## Files
 
 - `src/main.m` — swizzle logic
-- `build.sh` — compile + bundle osax
-- `build_pkg.sh` — build + .pkg installer
-- `install.sh` — local dev install (no pkg)
-- `uninstall.sh` — remove all (incl legacy)
-- `ColumnTamerHelper` — Finder PID watcher
-- `com.local.columntamer.helper.plist` — LaunchAgent
-- `test_inject.sh` — manual dlopen test via lldb
+- `menu-app/Main.swift` — menubar app (status item, prefs, diagnostics, about)
+- `build-osax.sh` — compile osax leaf (x86_64 + arm64 + arm64e)
+- `menu-app/build.sh` — compile menu leaf (arm64 + arm64e)
+- `scripts/build.sh` — orchestrator (4 doors: build/run/release/package)
+- `scripts/devinstall.sh` — dev install (sudo)
+- `scripts/uninstall.sh` — full removal (sudo)
+- `scripts/pkg-scripts/{preinstall,postinstall}` — pkg installer hooks
+- `ColumnTamerHelper` — Finder PID watcher script (zsh)
+- `columntamer.{helper,menu}.plist` — LaunchAgent plists
+- `AGENTS.md` — conventions, signing flows, project layout
+- `test_inject.sh` — manual dlopen test via lldb (dev only)
+- `VERSION` — single source of truth
 
 ## Status
 
-Prototype — preview-lock working. Not packaged for public distribution yet.
+Stable preview-lock. Tested on Sonoma 14.8. Not packaged for public distribution yet.
 
 ## License
 
-MIT.
+MIT. See `LICENSE`.

@@ -46,7 +46,10 @@ for p in \
   rm -f "$p"
 done
 
-echo "=== forget pkg receipts ==="
+echo "=== forget pkg receipts + PK bundle registration ==="
+# pkgutil --forget clears receipt but PK also cache bundle ID → path mapping.
+# Nuke receipt files directly to ensure PK re-register on next install.
+sudo rm -f /var/db/receipts/columntamer.* /var/db/receipts/com.local.columntamer.* 2>/dev/null || true
 sudo pkgutil --forget columntamer 2>/dev/null || true
 sudo pkgutil --forget com.local.columntamer 2>/dev/null || true
 

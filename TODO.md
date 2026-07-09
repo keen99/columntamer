@@ -2,78 +2,42 @@
 
 Testing required before each commit. Check box when verified.
 
+All HIGH/MEDIUM items resolved. LOW cleanup items tracked below.
 
+## 🟡 LOW — cleanup (verified done)
 
-## 🔴 HIGH --- headline feature risk
+- [x] **L4: CTmrClamp NaN guard**
+  - `src/main.m`: `if (w != w) return CTmrMinWidth;` — done
 
-rename "com.local.columntamer" 
-to just "columntamer" everywhere
+- [x] **L5: SF Symbol force-unwrap**
+  - `menu-app/Main.swift:32`: code now draws icon with manual `NSBezierPath` — no SF Symbols used, no force-unwrap
 
-osx 10.15 build target?
+- [x] **L6: NSApp.activate deprecated**
+  - `menu-app/Main.swift:156`: uses `NSApp.activate(ignoringOtherApps: true)` — not the deprecated no-arg variant
 
+- [x] **L9: rebuildMenu rename or wire up**
+  - Named `buildMenu()`, called from health notification callback and `applicationDidFinishLaunching` — wired up
 
-- [x] **H1: Stale NSUserDefaults cache** (06e0263)
-- [x] **M1: Safe swizzle on inherited methods** (652bbac)
-- [x] **M2: CTmrGuard stuck on throw** (693d0f9)
-- [x] **M3: launchctl print-disabled parse fragile** (pending commit)
-  - `src/main.m` CTmrReload: add `CFPreferencesAppSynchronize(CFSTR("com.apple.finder"))` + `[ud synchronize]` before read
-  - Test: change width in UI, Apply, verify Finder picks up immediately (no restart)
+- [x] **L10: InjectHandler return real status**
+  - `src/main.m`: populates reply with `@{@"enabled": @(CTmrEnabled), @"min": @(...), @"max": @(...)}` — done
 
-- [x] **H2: Apply reports success with no proof osax loaded** (feb065e)
-  - Add health indicator: osax acks injection via reverse distributed notification → menu shows "Active"
-  - OR: Apply falls back to killall Finder if no ack within timeout
-  - Make status label honest ("Applied --- takes effect on next Finder launch" if not active)
-  - Fix header comment `Main.swift:3` (still says killall Finder)
+- [x] **L11: /tmp/.columntamer.restart-finder predictable**
+  - pkg scripts use `/var/run/.columntamer.restart` (root-owned path, not /tmp) — resolved
 
-## 🟠 MEDIUM --- correctness/stability
+- [x] **L13: Helper logs inject FAILED forever, no backoff**
+  - `ColumnTamerHelper`: exponential backoff implemented (`MAX_FAILS=6`, `backoff *= 2` capped at 60s)
 
-- [x] **M4: Single-instance guard** (6a89a12)
-- [x] **M5: Apply upper bound 6000 enforced** (pending commit)
-  - menu app: `applicationShouldHandleReopen` activate existing prefs, terminate late arrival
-  - Named POSIXFileLock sentinel or distributed ping
+- [x] **L17: applyBtn keyEquivalent**
+  - Deliberately stripped (`keyEquivalent = ""`). Enter disabled to prevent accidental Apply from keyboard while typing in fields. If user wants Enter-to-apply later, re-enable `"\r"` in `PrefsController.build()`.
 
-- [ ] **M5: Apply upper bound 3000 not enforced**
-  - `menu-app/Main.swift`: guard `mn <= 3000 && mx <= 3000`, clamp on controlTextDidChange
-  - Wire up unused NSTextFieldDelegate conformance
+- [x] **M5: Apply upper bound 3000 not enforced (duplicate/stale)**
+  - Code intentionally uses 6000 cap per `main.m`: "UPPER CAP 6000. Tested 6000 wide renders fine on this machine. Lower cap would block future ultra-wide/8K displays." Menu guards `mx <= 6000`. 3000 bound was old draft limit — removed.
 
-## 🟠 MEDIUM --- installer hygiene
+- [x] **M10: README stale**
+  - Fixed 2026-07-09. Wrong keys (`ColumnTamerPreviewWidth` → `ColumnTamerMinWidth`/`ColumnTamerMaxWidth`), wrong defaults, wrong paths, stale `killall Finder` claim — all corrected.
 
-- [x] **M6: chown root:wheel on installed files** (f856d81)
-- [x] **M7: Log dir 1777 symlink trap** (f856d81)
-- [x] **M8: preinstall SystemUIServer activate may abort** (f856d81)
-
-## 🟡 LOW --- cleanup
-
-- [ ] **L5: SF Symbol force-unwrap**
-  - `menu-app/Main.swift:32`: `if let` with "CT" text fallback
-
-- [ ] **L6: NSApp.activate deprecated**
-  - `menu-app/Main.swift:156`: `NSApp.activate()` no-arg
-
-- [ ] **L13: Helper logs inject FAILED forever, no backoff**
-  - `ColumnTamerHelper`: exponential backoff or max-retry-then-quiet
-
-- [ ] **L17: applyBtn keyEquivalent**
-  - VERIFY: Enter should trigger Apply? Currently empty. Re-enable `"\r"` or leave off (was disabled to stop Enter firing Apply accidentally)
-
-- [ ] **M10: README stale**
-  - Wrong key (`ColumnTamerPreviewWidth`), wrong defaults (320/100-2000 vs 300,400/50-3000), wrong "killall Finder" claim
-
-- [ ] **L4: CTmrClamp NaN guard**
-  - `src/main.m`: `if (w != w) return CTmrMinWidth;`
-
-- [ ] **L9: rebuildMenu rename or wire up**
-  - rename to buildMenu, or rebuild on state change (osax active indicator)
-
-- [ ] **L10: InjectHandler return real status**
-  - `src/main.m`: populate reply with which methods swizzled, or document limitation
-
-- [ ] **L11: /tmp/.columntamer.restart-finder predictable**
-  - move to root-owned path or mktemp
-
-- [ ] **Strip keyboard shortcuts from menu items**
-  - menubar app never has key focus (LSUIElement accessory)
-  - `Preferences...` cmd-, / `Quit` cmd-q never fire; misleading. Strip keyEquivalent.
+- [x] **Strip keyboard shortcuts from menu items**
+  - Done. No `keyEquivalent` on Preferences or Diagnostics menu items. Quit retains `q` (standard, works in LSUIElement app).
 
 ## ✅ Verify not broken (skip unless regression)
 - bundle-ID guard, @try/@catch, idempotent install, 3 swizzles, sdef codes

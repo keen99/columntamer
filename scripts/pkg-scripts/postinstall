@@ -24,13 +24,18 @@ CONSOLE_UID="$(/usr/bin/id -u "$CONSOLE_USER" 2>/dev/null || true)"
 
 # bootstrap agents AS USER. RunAtLoad=true auto-launches; no kickstart (blocks).
 # bootstrap runs backgrounded so postinstall returns fast.
+# NOTE: postinstall run as root by package_script_service — no tty.
+# sudo -u fail here. root can bootstrap user gui domain directly.
 if [[ -n "$CONSOLE_UID" ]]; then
-  /usr/bin/sudo -u "$CONSOLE_USER" /bin/launchctl bootout gui/$CONSOLE_UID "$HELPER_PLIST" 2>/dev/null || true
-  /usr/bin/sudo -u "$CONSOLE_USER" /bin/launchctl bootout gui/$CONSOLE_UID/columntamer.menu 2>/dev/null || true
-  /usr/bin/sudo -u "$CONSOLE_USER" /bin/launchctl bootout gui/$CONSOLE_UID "$MENU_PLIST" 2>/dev/null || true
+  # NOTE: launchctl bootstrap gui/$UID fail from package_script_service
+  # (EIO sandbox restriction). Plists install correctly — launchd picks
+  # them up on next login via RunAtLoad. For immediate effect, launch
+  # binaries directly via launchctl asuser (spawn in user context).
   /usr/bin/killall ColumnTamerMenu 2>/dev/null || true
-  /usr/bin/sudo -u "$CONSOLE_USER" /bin/launchctl bootstrap gui/$CONSOLE_UID "$HELPER_PLIST" &
-  /usr/bin/sudo -u "$CONSOLE_USER" /bin/launchctl bootstrap gui/$CONSOLE_UID "$MENU_PLIST" &
+  launchctl asuser "$CONSOLE_UID" /usr/bin/open "/Library/Application Support/ColumnTamer/ColumnTamerMenu.app" 2>/dev/null &
+  if [[ -x "$BIN" ]]; then
+    launchctl asuser "$CONSOLE_UID" "$BIN" 2>/dev/null &
+  fi
 fi
 
 # restart only if user agreed at preinstall prompt
@@ -39,7 +44,7 @@ if [[ -f "$FLAG" ]]; then
   rm -f "$FLAG"
 else
   if [[ -n "$CONSOLE_UID" ]]; then
-    /usr/bin/sudo -u "$CONSOLE_USER" /usr/bin/osascript -e \
+    launchctl asuser "$CONSOLE_UID" /usr/bin/osascript -e \
       'display notification "ColumnTamer installed. Restart Finder to activate." with title "ColumnTamer"' \
       2>/dev/null || true
   fi

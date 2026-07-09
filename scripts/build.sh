@@ -153,7 +153,16 @@ do_package() {
   cp -R "$OSAX" "$stage/Library/ScriptingAdditions/ColumnTamer.osax"
   cp "$ROOT/ColumnTamerHelper" "$stage/Library/Application Support/ColumnTamer/ColumnTamerHelper"
   chmod 755 "$stage/Library/Application Support/ColumnTamer/ColumnTamerHelper"
-  cp -R "$MENU" "$stage/Library/Application Support/ColumnTamer/ColumnTamerMenu.app"
+  # Flatten menu .app to separate files — PackageKit relocates bundles with
+  # matching CFBundleIdentifier. Flat files have no bundle ID → no relocation.
+  # Postinstall assembles .app from these files and re-signs.
+  mkdir -p "$stage/Library/Application Support/ColumnTamer/ColumnTamerMenu.app/Contents/MacOS"
+  cp "$MENU/Contents/MacOS/ColumnTamerMenu" "$stage/Library/Application Support/ColumnTamer/ColumnTamerMenu.app/Contents/MacOS/ColumnTamerMenu"
+  cp "$MENU/Contents/Info.plist" "$stage/Library/Application Support/ColumnTamer/ColumnTamerMenu.app/Contents/Info.plist"
+  cp "$MENU/Contents/PkgInfo" "$stage/Library/Application Support/ColumnTamer/ColumnTamerMenu.app/Contents/PkgInfo" 2>/dev/null || true
+  cp -R "$MENU/Contents/_CodeSignature" "$stage/Library/Application Support/ColumnTamer/ColumnTamerMenu.app/Contents/_CodeSignature" 2>/dev/null || true
+  # Zap source bundle — no need keep after staging
+  rm -rf "$OSAX" "$MENU"
   cp "$ROOT/columntamer.helper.plist" "$stage/Library/LaunchAgents/columntamer.helper.plist"
   cp "$ROOT/columntamer.menu.plist" "$stage/Library/LaunchAgents/columntamer.menu.plist"
 
@@ -180,6 +189,11 @@ do_package() {
     --version "$VERSION" \
     --ownership recommended \
     "$pkg"
+
+  # Zap staging dir AFTER pkg sealed. Prevent PK relocation during install:
+  # bundle at build/pkgroot/ match target bundle ID → PK link instead of
+  # copy to target path. Without source bundle, PK must extract payload.
+  rm -rf "$stage"
 
   if [[ "$notarize" -eq 1 ]]; then
     echo "▸ Signing pkg with Developer ID Installer: ${DEVELOPER_IDENTITY_INSTALLER:-$DEVELOPER_IDENTITY}"

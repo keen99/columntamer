@@ -32,8 +32,8 @@ release:
 package:
 	scripts/build.sh package
 
-install:
-	sudo scripts/install.sh
+devinstall:
+	sudo scripts/devinstall.sh
 
 uninstall:
 	sudo scripts/uninstall.sh

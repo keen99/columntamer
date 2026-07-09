@@ -13,7 +13,7 @@ make run        # build + dev inject (osascript event — needs osax installed
                 #   in /Library/ScriptingAdditions first via `make install`)
 make release    # RELEASE: smart-sign artifacts (osax + menu). No pkg.
 make package    # PACKAGE: build + .pkg installer (+notarize if DevID creds)
-make install    # sudo install to /Library/... (dev/testing). same layout as pkg
+make devinstall # sudo install to /Library/... (dev/testing). same layout as pkg
 make uninstall  # sudo remove everything (osax + helper + menu + agents + prefs)
 make clean      # wipe build/
 make show-sign  # print detected signing identity + team
@@ -22,8 +22,8 @@ make show-sign  # print detected signing identity + team
 ### run vs install
 
 - `make run` only injects osax into running Finder. osax must already be
-  installed in `/Library/ScriptingAdditions/`. First time: `make install`.
-- `make install` = sudo copies to system paths + bootstraps LaunchAgents.
+  installed in `/Library/ScriptingAdditions/`. First time: `make devinstall`.
+- `make devinstall` = sudo copies to system paths + bootstraps LaunchAgents.
   Dev/testing path. Use `make package` + `installer` for clean pkg-based install.
 
 ## Project layout (system-type)
@@ -48,8 +48,10 @@ for persistence safety). Same constraint as XtraFinder.
 ## Requirements
 
 - macOS 10.15+
-- **SIP off** + AMFI library validation disabled (required for Finder osax
-  injection; Apple will not notarize injection. Same as XtraFinder.)
+- **SIP off** — required for unsigned scripting addition loading into Finder.
+  Apple Dev / Developer ID signed osax work with SIP off alone.
+  Ad-hoc/unsigned builds may need `amfi_get_out_of_my_way=1` additionally.
+  (Apple will not notarize injection. Same as XtraFinder.)
 - arm64 + arm64e (Apple Silicon kernel flavors)
 
 ## uninstall details

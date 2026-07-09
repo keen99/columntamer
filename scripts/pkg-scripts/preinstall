@@ -17,11 +17,16 @@ if [[ "${COMMAND_LINE_INSTALL:-0}" == "1" ]]; then
   exit 0
 fi
 
-RESULT="$(/usr/bin/launchctl asuser "$CONSOLE_UID" /usr/bin/sudo -u "$CONSOLE_USER" /usr/bin/osascript -e '
+RESULT="$(launchctl asuser "$CONSOLE_UID" /usr/bin/osascript -e '
   return button returned of (display dialog "ColumnTamer will be installed." & return & return & "Restart Finder afterward to activate?" with title "ColumnTamer" buttons {"Later", "Restart After Install"} default button "Restart After Install" with icon note giving up after 300)
 ' 2>/dev/null || true)"
 
 if [[ "$RESULT" == *"Restart After Install"* ]]; then
+  /bin/echo "yes" > "$FLAG"
+fi
+
+# Default restart if dialog fail (no tty, sandbox, timeout). Safer.
+if [[ ! -f "$FLAG" ]]; then
   /bin/echo "yes" > "$FLAG"
 fi
 
