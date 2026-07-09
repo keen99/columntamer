@@ -145,7 +145,7 @@ static void xpl_setWidth_ofColumn_stretch(NSBrowser *self, SEL _cmd,
 
 // -[_NSBrowserPreviewColumnViewController widthThatFits]
 static CGFloat xpl_widthThatFits(id self, SEL _cmd) {
-    if (CTmrEnabled) {
+    if (CTmrEnabled && CTmrGuard == 0) {
         CGFloat w = orig_widthThatFits ? orig_widthThatFits(self, _cmd) : CTmrMinWidth;
         return CTmrClamp(w);
     }

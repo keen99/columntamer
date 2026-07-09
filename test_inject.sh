@@ -1,5 +1,7 @@
 #!/bin/bash
-# Test load ColumnTamer dylib into live Finder via lldb.
+# DEV TOOL ONLY — NOT FOR SHIPPING.
+# Attach lldb to live Finder, dlopen ColumnTamer dylib for testing.
+# Requires SIP off + root. Do not distribute.
 set -eu
 DYLIB="$1"
 PID=$(pgrep -x Finder)

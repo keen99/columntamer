@@ -1,3 +1,6 @@
 build/
 *.dylib
 .DS_Store
+*.log
+menubuild/
+pkgroot/

@@ -41,6 +41,12 @@ make package    # Release + .pkg installer (+notarize if DevID creds)
 
 See `AGENTS.md` for full build/install/uninstall docs.
 
+**Note on `make package` vs `make devinstall`:** PackageKit relocates `.app`
+bundles when matching CFBundleIdentifier exists on disk (e.g., from a prior
+build). `make package` deletes staging dir after building to prevent this.
+`make devinstall` bypasses PackageKit entirely via direct file copy — use
+for day-to-day development.
+
 ## Install
 
 ```bash
