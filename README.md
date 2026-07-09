@@ -87,7 +87,7 @@ Set both equal for fixed width. Set min > max to disable clamping (passthrough).
 
 ## Status
 
-Stable preview-lock. Tested on Sonoma 14.8. Not packaged for public distribution yet.
+Stable preview-lock. Tested on 10.15 Catalina + Sonoma 14.8. Not packaged for public distribution yet.
 
 ## License
 
