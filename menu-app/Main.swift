@@ -167,9 +167,17 @@ enum CTDefaults {
     static let domain = "com.apple.finder"
     static let minKey = "ColumnTamerMinWidth"
     static let maxKey = "ColumnTamerMaxWidth"
+    static let asMinKey = "ColumnTamerAutosizeMin"
+    static let asMaxKey = "ColumnTamerAutosizeMax"
+    static let asPadKey = "ColumnTamerAutosizePadding"
+    static let asEnKey  = "ColumnTamerAutosizeEnabled"
 
     static func readMin() -> CGFloat { defaultsFloat(minKey, default: 240) }
     static func readMax() -> CGFloat { defaultsFloat(maxKey, default: 350) }
+    static func readAsMin() -> CGFloat { defaultsFloat(asMinKey, default: 120) }
+    static func readAsMax() -> CGFloat { defaultsFloat(asMaxKey, default: 2000) }
+    static func readAsPad() -> CGFloat { max(12, defaultsFloat(asPadKey, default: 16)) }
+    static func readAsEn() -> Bool { defaultsBool(asEnKey, default: true) }
 
     static func write(min mn: CGFloat, max mx: CGFloat) {
         let d = UserDefaults(suiteName: domain) ?? UserDefaults.standard
@@ -177,10 +185,24 @@ enum CTDefaults {
         d.set(Double(mx), forKey: maxKey)
     }
 
+    static func writeAutosize(enabled en: Bool, min mn: CGFloat, max mx: CGFloat, pad: CGFloat) {
+        let d = UserDefaults(suiteName: domain) ?? UserDefaults.standard
+        d.set(en, forKey: asEnKey)
+        d.set(Double(mn), forKey: asMinKey)
+        d.set(Double(mx), forKey: asMaxKey)
+        d.set(Double(pad), forKey: asPadKey)
+        d.synchronize()
+    }
+
     static func defaultsFloat(_ key: String, default d: CGFloat) -> CGFloat {
         let ud = UserDefaults(suiteName: domain) ?? UserDefaults.standard
-        let v = ud.float(forKey: key)
-        return v == 0 ? d : CGFloat(v)
+        guard let value = ud.object(forKey: key) as? NSNumber else { return d }
+        return CGFloat(value.doubleValue)
+    }
+
+    static func defaultsBool(_ key: String, default d: Bool) -> Bool {
+        let ud = UserDefaults(suiteName: domain) ?? UserDefaults.standard
+        return ud.object(forKey: key) != nil ? ud.bool(forKey: key) : d
     }
 }
 
@@ -237,6 +259,11 @@ final class PrefsController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     private var maxField: NSTextField!
     private var loginBtn: NSButton!
     private var statusLabel: NSTextField!
+    // autosize
+    private var asEnBtn: NSButton!
+    private var asMinField: NSTextField!
+    private var asMaxField: NSTextField!
+    private var asPadField: NSTextField!
 
     func showWindow() {
         if window == nil { build() }
@@ -247,7 +274,7 @@ final class PrefsController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     }
 
     private func build() {
-        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 320, height: 230),
+        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 380, height: 470),
                          styleMask: [.titled, .closable],
                          backing: .buffered, defer: false)
         w.title = "ColumnTamer"
@@ -262,15 +289,34 @@ final class PrefsController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         c.edgeInsets = NSEdgeInsets(top: 16, left: 20, bottom: 16, right: 20)
         c.translatesAutoresizingMaskIntoConstraints = false
 
-        let title = NSTextField(labelWithString: "Preview pane width range (px)")
-        title.font = .boldSystemFont(ofSize: 12)
+        // ── Preview pane ──
+        let prevTitle = NSTextField(labelWithString: "Preview pane width")
+        prevTitle.font = .boldSystemFont(ofSize: 12)
+        let prevHelp = helpLabel("Minimum and maximum constrain preview pane width. Values use macOS points, not characters. Allowed range: 240–6000 pt.")
 
-        let rowMin = labeledRow("Minimum:", tag: 1, initial: "")
+        let rowMin = labeledRow("Minimum (pt):", tag: 1, initial: "", range: 240...6000)
         minField = rowMin.field
-        let rowMax = labeledRow("Maximum:", tag: 2, initial: "")
+        let rowMax = labeledRow("Maximum (pt):", tag: 2, initial: "", range: 240...6000)
         maxField = rowMax.field
 
-        loginBtn = NSButton(checkboxWithTitle: "Start ColumnTamer at login",
+        // ── Column autosize ──
+        let asTitle = NSTextField(labelWithString: "Column width autosize")
+        asTitle.font = .boldSystemFont(ofSize: 12)
+        let asHelp = helpLabel("Fits each column to its longest filename. Trailing space is blank room after the filename and prevents clipping. Width range: 0–6000 pt; trailing-space range: 12–200 pt. Finder may enforce a larger internal minimum.")
+
+        asEnBtn = NSButton(checkboxWithTitle: "Enable column autosize",
+                           target: self, action: nil)
+        asEnBtn.state = CTDefaults.readAsEn() ? .on : .off
+
+        let rowAsMin = labeledRow("Minimum (pt):", tag: 3, initial: "", range: 0...6000)
+        asMinField = rowAsMin.field
+        let rowAsMax = labeledRow("Maximum (pt):", tag: 4, initial: "", range: 0...6000)
+        asMaxField = rowAsMax.field
+        let rowAsPad = labeledRow("Trailing space (pt):", tag: 5, initial: "", range: 12...200)
+        asPadField = rowAsPad.field
+
+        // ── Login ──
+        loginBtn = NSButton(checkboxWithTitle: "Start at login",
                             target: self, action: #selector(toggleLogin))
         loginBtn.state = CTLogin.isEnabled ? .on : .off
 
@@ -283,9 +329,18 @@ final class PrefsController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         applyBtn.bezelStyle = .rounded
         applyBtn.keyEquivalent = ""
 
-        c.addArrangedSubview(title)
+        c.addArrangedSubview(prevTitle)
+        c.addArrangedSubview(prevHelp)
         c.addArrangedSubview(rowMin.view)
         c.addArrangedSubview(rowMax.view)
+        c.addArrangedSubview(NSView()) // spacer
+        c.addArrangedSubview(asTitle)
+        c.addArrangedSubview(asHelp)
+        c.addArrangedSubview(asEnBtn)
+        c.addArrangedSubview(rowAsMin.view)
+        c.addArrangedSubview(rowAsMax.view)
+        c.addArrangedSubview(rowAsPad.view)
+        c.addArrangedSubview(NSView())
         c.addArrangedSubview(loginBtn)
         c.addArrangedSubview(statusLabel)
         c.addArrangedSubview(applyBtn)
@@ -302,7 +357,16 @@ final class PrefsController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
 
     private struct RowResult { let view: NSView; let field: NSTextField }
 
-    private func labeledRow(_ label: String, tag: Int, initial: String) -> RowResult {
+    private func helpLabel(_ text: String) -> NSTextField {
+        let label = NSTextField(wrappingLabelWithString: text)
+        label.font = .systemFont(ofSize: 10)
+        label.textColor = .secondaryLabelColor
+        label.preferredMaxLayoutWidth = 330
+        return label
+    }
+
+    private func labeledRow(_ label: String, tag: Int, initial: String,
+                            range: ClosedRange<Int>) -> RowResult {
         let h = NSStackView()
         h.orientation = .horizontal
         h.spacing = 8
@@ -311,6 +375,7 @@ final class PrefsController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         let f = NSTextField(string: initial)
         f.tag = tag
         f.delegate = self
+        f.toolTip = "Allowed: \(range.lowerBound)–\(range.upperBound) points"
         f.translatesAutoresizingMaskIntoConstraints = false
         f.widthAnchor.constraint(equalToConstant: 70).isActive = true
         h.addArrangedSubview(l)
@@ -323,15 +388,41 @@ final class PrefsController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     private func loadValues() {
         minField.intValue = Int32(CTDefaults.readMin())
         maxField.intValue = Int32(CTDefaults.readMax())
+        asEnBtn.state = CTDefaults.readAsEn() ? .on : .off
+        asMinField.intValue = Int32(CTDefaults.readAsMin())
+        asMaxField.intValue = Int32(CTDefaults.readAsMax())
+        asPadField.intValue = Int32(CTDefaults.readAsPad())
         loginBtn.state = CTLogin.isEnabled ? .on : .off
     }
 
-    // live filter: digits only. No range clamp live (rewriting stringValue
-    // resets cursor mid-type = typing fight). Range enforced on Apply.
+    // Live filter: digits only. Range checks happen when editing ends, allowing
+    // partial values such as 3 -> 30 -> 300 in preview fields.
     func controlTextDidChange(_ n: Notification) {
         guard let f = n.object as? NSTextField else { return }
         let digits = f.stringValue.filter { $0.isNumber }
         if digits != f.stringValue { f.stringValue = digits }
+    }
+
+    func control(_ control: NSControl, textShouldEndEditing fieldEditor: NSText) -> Bool {
+        guard let field = control as? NSTextField,
+              let value = Int(field.stringValue) else {
+            statusLabel.stringValue = "Enter a whole number."
+            NSSound.beep()
+            return false
+        }
+        let allowed: ClosedRange<Int>
+        switch field.tag {
+        case 1, 2: allowed = 240...6000
+        case 3, 4: allowed = 0...6000
+        case 5: allowed = 12...200
+        default: return true
+        }
+        guard allowed.contains(value) else {
+            statusLabel.stringValue = "Allowed: \(allowed.lowerBound)–\(allowed.upperBound) pt."
+            NSSound.beep()
+            return false
+        }
+        return true
     }
 
     @objc func toggleLogin() {
@@ -345,21 +436,32 @@ final class PrefsController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     }
 
     @objc func apply() {
-        let mn = CGFloat(minField.intValue)
-        let mx = CGFloat(maxField.intValue)
-        guard mn >= 240, mx >= 240, mn <= mx, mx <= 6000 else {
-            statusLabel.stringValue = "Need 240–6000, min ≤ max."
+        // Commit active field editor before reading intValue.
+        guard window.makeFirstResponder(nil) else {
+            statusLabel.stringValue = "Finish editing field, then Apply."
             return
         }
-        // No sub-floor warning needed: 240 is the hard limit below which Finder
-        // ignores the clamp (preview pane intrinsic width). Enforced here.
+        let mn = CGFloat(minField.intValue)
+        let mx = CGFloat(maxField.intValue)
+        let asMn = CGFloat(asMinField.intValue)
+        let asMx = CGFloat(asMaxField.intValue)
+        let asPad = CGFloat(asPadField.intValue)
+        guard mn >= 240, mx >= 240, mn <= mx, mx <= 6000 else {
+            statusLabel.stringValue = "Preview clamp need 240-6000, min ≤ max."
+            return
+        }
+        guard asMn >= 0, asMx <= 6000, asMn <= asMx, asPad >= 12, asPad <= 200 else {
+            statusLabel.stringValue = "Autosize bounds invalid."
+            return
+        }
         CTDefaults.write(min: mn, max: mx)
-        // post distributed notification -> osax re-reads prefs live, no Finder restart
+        CTDefaults.writeAutosize(enabled: asEnBtn.state == .on, min: asMn, max: asMx, pad: asPad)
         CFNotificationCenterPostNotification(
             CFNotificationCenterGetDistributedCenter(),
             CFNotificationName("columntamer.prefsChanged" as CFString),
             nil, nil, true)
-        statusLabel.stringValue = "Applied."
+        let state = asEnBtn.state == .on ? "on" : "off"
+        statusLabel.stringValue = "Applied: autosize \(state), \(Int(asMn))–\(Int(asMx)) pt, trailing \(Int(asPad)) pt."
     }
 }
 
