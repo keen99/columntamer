@@ -17,7 +17,7 @@ export SIGN_TEAM := $(shell security find-certificate -c "$(SIGN_DEV_CERT)" -p 2
 	| grep -oE 'OU=[A-Z0-9]+' | cut -d= -f2)
 endif
 
-.PHONY: build run release package clean install-tools show-sign uninstall devinstall tag
+.PHONY: build run release package clean install-tools show-sign uninstall tag
 
 V := $(shell cat VERSION)
 
@@ -36,7 +36,7 @@ release:
 	  echo "Version set to v$$new"
 	@if [ "$$(cat VERSION)" != "$(V)" ]; then \
 	  git add VERSION; \
-	  git commit -m "chore: bump version to v'$$(cat VERSION)'"; \
+	  git commit -m "chore: bump version to v$$(cat VERSION)"; \
 	fi
 	$(MAKE) clean
 	scripts/build.sh package
@@ -44,9 +44,6 @@ release:
 
 package:
 	scripts/build.sh package
-
-devinstall:
-	sudo scripts/devinstall.sh
 
 uninstall:
 	sudo scripts/uninstall.sh
@@ -62,10 +59,14 @@ show-sign:
 	@echo "SIGN_TEAM=[$$SIGN_TEAM]"
 
 tag:
-	@echo "=== Tagging v$(V) ==="
-	git tag v$(V)
-	@echo "=== Pushing tag ==="
-	git push origin v$(V)
-	@echo "=== Creating GitHub release ==="
-	gh release create v$(V) --title "v$(V)" --notes "See README." build/ColumnTamer-$(V).pkg
-	@echo "DONE: https://github.com/keen99/columntamer/releases/tag/v$(V)"
+	@v=$$(cat VERSION); \
+	echo "=== Tagging v$$v ==="; \
+	if git rev-parse "v$$v" >/dev/null 2>&1; then \
+	  echo "tag v$$v exists, skipping"; \
+	else \
+	  git tag -a "v$$v" -m "Release v$$v"; \
+	  git push origin "v$$v"; \
+	  echo "=== Creating GitHub release ==="; \
+	  gh release create "v$$v" --title "v$$v" --notes "See README." "build/ColumnTamer-$$v.pkg"; \
+	  echo "DONE: https://github.com/keen99/columntamer/releases/tag/v$$v"; \
+	fi
