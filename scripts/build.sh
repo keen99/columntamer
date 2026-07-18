@@ -126,7 +126,7 @@ do_launch() {
   sleep 2
 
   echo "▸ Inject into Finder"
-  /usr/bin/osascript -e 'tell application "Finder" to «event CTmrIjct»' 2>&1 || \
+  osascript -e 'tell application "Finder" to «event CTmrIjct»' 2>&1 || \
     echo "  (inject failed — Finder may need restart: killall Finder)"
 }
 
@@ -181,19 +181,41 @@ do_package() {
     echo "▸ Notarize: skipped (some creds unset). pkg unsigned — Gatekeeper warns for others."
   fi
 
-  echo "▸ pkgbuild"
+  echo "▸ pkgbuild (component)"
+  local comp="$ROOT/build/ColumnTamer-component.pkg"
   pkgbuild \
     --root "$stage" \
     --scripts "$scripts_dir" \
     --identifier "columntamer" \
     --version "$VERSION" \
     --ownership recommended \
-    "$pkg"
+    "$comp"
 
-  # Zap staging dir AFTER pkg sealed. Prevent PK relocation during install:
-  # bundle at build/pkgroot/ match target bundle ID → PK link instead of
-  # copy to target path. Without source bundle, PK must extract payload.
+  # Zap staging dir AFTER pkg sealed.
   rm -rf "$stage"
+
+  echo "▸ productbuild (wrap → rootVolumeOnly, no disk select)"
+  # rootVolumeOnly deprecated but work — skip disk select on multi-volume Macs.
+  local dist="$ROOT/build/Distribution.xml"
+  cat >"$dist" <<XML
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<installer-gui-script minSpecVersion="2">
+  <title>ColumnTamer</title>
+  <options customize="never" require-scripts="false" rootVolumeOnly="true"/>
+  <choices-outline>
+    <line choice="columntamer"/>
+  </choices-outline>
+  <choice id="columntamer" title="ColumnTamer">
+    <pkg-ref id="columntamer"/>
+  </choice>
+  <pkg-ref id="columntamer" version="$VERSION" onConclusion="none">ColumnTamer-component.pkg</pkg-ref>
+</installer-gui-script>
+XML
+  productbuild \
+    --distribution "$dist" \
+    --package-path "$ROOT/build" \
+    "$pkg"
+  rm -f "$comp"
 
   if [[ "$notarize" -eq 1 ]]; then
     echo "▸ Signing pkg with Developer ID Installer: ${DEVELOPER_IDENTITY_INSTALLER:-$DEVELOPER_IDENTITY}"
