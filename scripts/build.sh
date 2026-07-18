@@ -154,8 +154,8 @@ do_package() {
 
   echo "▸ Stage payload"
   rm -rf "$stage" "$scripts_dir" "$pkg"
-  mkdir -p "$stage/Library/ScriptingAdditions" \
-           "$stage/Library/Application Support/ColumnTamer" \
+  mkdir -p "$stage/Applications" \
+           "$stage/Library/ScriptingAdditions" \
            "$stage/Library/LaunchAgents" \
            "$scripts_dir"
 
@@ -163,11 +163,11 @@ do_package() {
   # Flatten menu .app to separate files — PackageKit relocates bundles with
   # matching CFBundleIdentifier. Flat files have no bundle ID → no relocation.
   # Postinstall assembles .app from these files and re-signs.
-  mkdir -p "$stage/Library/Application Support/ColumnTamer/ColumnTamerMenu.app/Contents/MacOS"
-  cp "$MENU/Contents/MacOS/ColumnTamerMenu" "$stage/Library/Application Support/ColumnTamer/ColumnTamerMenu.app/Contents/MacOS/ColumnTamerMenu"
-  cp "$MENU/Contents/Info.plist" "$stage/Library/Application Support/ColumnTamer/ColumnTamerMenu.app/Contents/Info.plist"
-  cp "$MENU/Contents/PkgInfo" "$stage/Library/Application Support/ColumnTamer/ColumnTamerMenu.app/Contents/PkgInfo" 2>/dev/null || true
-  cp -R "$MENU/Contents/_CodeSignature" "$stage/Library/Application Support/ColumnTamer/ColumnTamerMenu.app/Contents/_CodeSignature" 2>/dev/null || true
+  mkdir -p "$stage/Applications/ColumnTamerMenu.app/Contents/MacOS"
+  cp "$MENU/Contents/MacOS/ColumnTamerMenu" "$stage/Applications/ColumnTamerMenu.app/Contents/MacOS/ColumnTamerMenu"
+  cp "$MENU/Contents/Info.plist" "$stage/Applications/ColumnTamerMenu.app/Contents/Info.plist"
+  cp "$MENU/Contents/PkgInfo" "$stage/Applications/ColumnTamerMenu.app/Contents/PkgInfo" 2>/dev/null || true
+  cp -R "$MENU/Contents/_CodeSignature" "$stage/Applications/ColumnTamerMenu.app/Contents/_CodeSignature" 2>/dev/null || true
   # Zap source bundle — no need keep after staging
   rm -rf "$OSAX" "$MENU"
   cp "$ROOT/columntamer.menu.plist" "$stage/Library/LaunchAgents/columntamer.menu.plist"
@@ -188,9 +188,15 @@ do_package() {
   fi
 
   echo "▸ pkgbuild (component)"
+  # BundleIsRelocatable=false — PK relocate bug: bundle ID registered to
+  # prior path (dev or pre-rehome install) = payload redirected away from
+  # declared pkgroot. Force non-relocatable = PK honors stage paths.
+  local complist="$ROOT/build/component.plist"
+  printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<array>\n<dict>\n<key>RootRelativeBundlePath</key>\n<string>Applications/ColumnTamerMenu.app</string>\n<key>BundleIsRelocatable</key>\n<false/>\n</dict>\n</array>\n</plist>\n' > "$complist"
   local comp="$ROOT/build/ColumnTamer-component.pkg"
   pkgbuild \
     --root "$stage" \
+    --component-plist "$complist" \
     --scripts "$scripts_dir" \
     --identifier "columntamer" \
     --version "$VERSION" \

@@ -1,12 +1,12 @@
 #!/bin/bash
 # Local install (no pkg) — osax + menu app + LaunchAgent.
-# Same layout as pkg. For dev/testing. Helper folded into menu (NSTimer poll).
+# Menu in /Applications (user-launchable). osax in /Library/ScriptingAdditions.
 set -eu
 cd "$(dirname "$0")"
 
 OSAX="/Library/ScriptingAdditions/ColumnTamer.osax"
-APPROOT="/Library/Application Support/ColumnTamer"
-MENU_APP="$APPROOT/ColumnTamerMenu.app"
+MENU_APP="/Applications/ColumnTamerMenu.app"
+LEGACY_APPROOT="/Library/Application Support/ColumnTamer"
 MENU_PLIST="/Library/LaunchAgents/columntamer.menu.plist"
 UIDU="$(id -u)"
 
@@ -14,9 +14,9 @@ echo "=== stop old agents ==="
 # Sweep legacy helper (pre-fold installs shipped shell helper + LaunchAgent).
 launchctl bootout gui/$UIDU/columntamer.helper 2>/dev/null || true
 sudo rm -f "/Library/LaunchAgents/columntamer.helper.plist" 2>/dev/null || true
-pkill -f "$APPROOT/ColumnTamerHelper" 2>/dev/null || true
+pkill -f "ColumnTamerHelper" 2>/dev/null || true
 launchctl bootout gui/$UIDU/columntamer.menu 2>/dev/null || true
-pkill -f "$MENU_APP" 2>/dev/null || true
+pkill -f "ColumnTamerMenu" 2>/dev/null || true
 
 echo "=== install osax (sudo) ==="
 sudo -v
@@ -26,11 +26,13 @@ sudo chown -R root:wheel "$OSAX"
 # signed by build step; do NOT re-sign ad-hoc (breaks Finder load)
 
 echo "=== install menu app ==="
-sudo mkdir -p "$APPROOT"
 sudo rm -rf "$MENU_APP"
 sudo cp -R ../build/menubuild/ColumnTamerMenu.app "$MENU_APP"
 sudo chown -R root:wheel "$MENU_APP"
 # signed by build step; do NOT re-sign ad-hoc
+
+echo "=== remove legacy approot (pre-rehome) ==="
+sudo rm -rf "$LEGACY_APPROOT"
 
 echo "=== install LaunchAgent ==="
 sudo cp ../columntamer.menu.plist "$MENU_PLIST"

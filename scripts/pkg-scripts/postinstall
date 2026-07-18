@@ -11,16 +11,20 @@ log "args: $*"
 log "caller uid=$(id -u) user=$(id -un)"
 
 MENU_PLIST="/Library/LaunchAgents/columntamer.menu.plist"
+LEGACY_APPROOT="/Library/Application Support/ColumnTamer"
 FLAG="/var/run/.columntamer.restart"
 
-# M7: remove stale shared logdir from older installs (was 1777 symlink trap).
-rm -rf "/Library/Application Support/ColumnTamer/logs"
+# Remove legacy approot from pre-rehome installs (menu now in /Applications).
+# osax stays in /Library/ScriptingAdditions (Finder load path, required).
+rm -rf "$LEGACY_APPROOT"
 
 # M6: pin ownership to root:wheel (installer runs as root; staged files
 # otherwise may carry dev-user ownership = persistence vector).
 chown -R root:wheel "/Library/ScriptingAdditions/ColumnTamer.osax"
-chown -R root:wheel "/Library/Application Support/ColumnTamer"
-chown root:wheel "$MENU_PLIST"
+# Menu in /Applications = user:admin (drag-install standard, match XtraFinder).
+# No root:wheel (non-standard for /Applications).
+# osax stays root:wheel (system path).
+chown root:wheel "$MENU_PLIST" 2>/dev/null || true
 
 CONSOLE_USER="$(stat -f%Su /dev/console 2>/dev/null || true)"
 CONSOLE_UID="$(id -u "$CONSOLE_USER" 2>/dev/null || true)"
@@ -29,7 +33,7 @@ log "detected CONSOLE_USER=$CONSOLE_USER CONSOLE_UID=$CONSOLE_UID"
 # Sweep legacy helper artifacts (pre-fold installs shipped shell helper +
 # LaunchAgent). Kill stray helper procs, remove plist, bootout if registered.
 pkill -f "ColumnTamerHelper" 2>/dev/null || true
-rm -f "/Library/Application Support/ColumnTamer/ColumnTamerHelper"
+rm -f "$LEGACY_APPROOT/ColumnTamerHelper"
 rm -f "/Library/LaunchAgents/columntamer.helper.plist"
 if [[ -n "$CONSOLE_UID" ]]; then
   launchctl asuser "$CONSOLE_UID" -- launchctl bootout \
@@ -48,7 +52,7 @@ pkill -f "ColumnTamerMenu" 2>/dev/null || true
 # (menu = UI + reinject poll, osax independent).
 if [[ -n "$CONSOLE_UID" ]]; then
   log "opening menu..."
-  open "/Library/Application Support/ColumnTamer/ColumnTamerMenu.app" 2>/dev/null || true
+  open "/Applications/ColumnTamerMenu.app" 2>/dev/null || true
   log "menu open done"
   log "ps after launch: $(ps ax | grep -i ColumnTamer | grep -v grep | tr '\n' '|')"
 fi

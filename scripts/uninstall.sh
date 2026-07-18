@@ -4,8 +4,8 @@
 set -eu
 
 OSAX="/Library/ScriptingAdditions/ColumnTamer.osax"
-APPROOT="/Library/Application Support/ColumnTamer"
-MENU_APP="/Library/Application Support/ColumnTamer/ColumnTamerMenu.app"
+LEGACY_APPROOT="/Library/Application Support/ColumnTamer"
+MENU_APP="/Applications/ColumnTamerMenu.app"
 LOG="/tmp/columntamer-postinstall.log"
 
 CONSOLE_USER="$(stat -f%Su /dev/console 2>/dev/null || echo "$USER")"
@@ -27,7 +27,9 @@ killall ColumnTamerMenu 2>/dev/null || true
 
 echo "=== remove files ==="
 sudo rm -rf "$OSAX"
-sudo rm -rf "$APPROOT"
+sudo rm -rf "$MENU_APP"
+# Legacy approot from pre-rehome installs (menu now in /Applications).
+sudo rm -rf "$LEGACY_APPROOT"
 
 echo "=== remove LaunchAgent plists ==="
 for p in \

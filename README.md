@@ -102,11 +102,10 @@ sudo installer -pkg build/ColumnTamer-$VERSION.pkg -target /
 
 Installs:
 - osax → `/Library/ScriptingAdditions/ColumnTamer.osax`
-- helper → `/Library/Application Support/ColumnTamer/ColumnTamerHelper`
-- menu app → `/Library/Application Support/ColumnTamer/ColumnTamerMenu.app`
-- LaunchAgents → `/Library/LaunchAgents/columntamer.{helper,menu}.plist`
+- menu app → `/Applications/ColumnTamerMenu.app`
+- LaunchAgent → `/Library/LaunchAgents/columntamer.menu.plist`
 
-Helper watches Finder PID, auto-injects. Menu app provides prefs panel + health indicator.
+Menu app provides prefs panel + health indicator + Finder-reinject poll (osax reload on Finder restart).
 
 ## Uninstall
 
