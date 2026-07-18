@@ -117,6 +117,22 @@ XF Instruction.rtf confirms our findings:
   - Menu dead = CT still clamps columns (osax independent)
   - Works 10.15 / 14 / 15 (Intel + Apple Silicon)
 
+## 🟡 MEDIUM — UX clarity
+
+- [ ] **Menu Quit does not stop ColumnTamer**
+  - Menu = UI only. Quit menu = prefs/status/diag gone, osax still active in
+    Finder (columns still clamped). User likely expects Quit = stop CT.
+  - Options:
+    - Rename Quit → "Hide Menu" (accurate, but nonstandard)
+    - Add separate "Quit ColumnTamer" that disable osax (write CTmrEnabled=0
+      + restart Finder) vs "Close Window"/hide
+    - Confirm dialog on Quit: "Quitting menu only. ColumnTamer stays active
+      in Finder. To fully stop, use Diagnostics → Disable."
+    - Status item tooltip / menu footer text: "Menu UI only. Osax runs in
+      Finder independently."
+  - Also need: Disable path in menu (write CTmrEnabled=0 + Finder restart)
+    so user has real stop without uninstall.
+
 ## 🔬 Future investigation
 
 - [ ] **Investigate breaking the ~240 preview-pane min-width floor**
