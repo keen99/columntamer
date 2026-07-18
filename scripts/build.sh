@@ -32,9 +32,13 @@ MODE="${1:-run}"
 # ── Shared metadata ────────────────────────────────────────────────────────
 [[ -f VERSION ]] || { echo "✗ VERSION missing"; exit 1; }
 VERSION="$(tr -d '[:space:]' < VERSION)"
-# Release vs dev: tag v0.1.0-test exactly at HEAD = release. Else dev.
+# Release vs dev: tag v$VERSION exactly at HEAD = release. Else dev.
 # Distinguish live release pkg from post-release dev builds.
-if git describe --tags --exact-match HEAD 2>/dev/null | grep -qx "v0.1.0-test"; then
+# NOTE: git describe --exact-match lies if tag is ancestor of HEAD (not
+# strict). Compare tag commit == HEAD commit direct.
+TAG_COMMIT="$(git rev-list -n1 "v$VERSION" 2>/dev/null || true)"
+HEAD_COMMIT="$(git rev-parse HEAD 2>/dev/null || true)"
+if [[ -n "$TAG_COMMIT" && "$TAG_COMMIT" == "$HEAD_COMMIT" ]]; then
   SUFFIX=""
 else
   SUFFIX="-dev"

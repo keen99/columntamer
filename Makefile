@@ -17,7 +17,7 @@ export SIGN_TEAM := $(shell security find-certificate -c "$(SIGN_DEV_CERT)" -p 2
 	| grep -oE 'OU=[A-Z0-9]+' | cut -d= -f2)
 endif
 
-.PHONY: build run release package clean install-tools show-sign uninstall tag
+.PHONY: build run release package clean install-tools show-sign uninstall tag tag-build tag-push
 
 V := $(shell cat VERSION)
 
@@ -38,9 +38,10 @@ release:
 	  git add VERSION; \
 	  git commit -m "chore: bump version to v$$(cat VERSION)"; \
 	fi
+	$(MAKE) tag-build
 	$(MAKE) clean
 	scripts/build.sh package
-	$(MAKE) tag
+	$(MAKE) tag-push
 
 package:
 	scripts/build.sh package
@@ -57,6 +58,44 @@ install-tools:
 show-sign:
 	@echo "SIGN_IDENTITY=[$$SIGN_IDENTITY]"
 	@echo "SIGN_TEAM=[$$SIGN_TEAM]"
+
+tag-build:
+	@v=$$(cat VERSION); \
+	echo "=== Tagging v$$v (local) ==="; \
+	if git rev-parse "v$$v" >/dev/null 2>&1; then \
+	  cur=$$(git rev-list -n1 "v$$v"); \
+	  new=$$(git rev-parse HEAD); \
+	  echo "tag v$$v exists at $$cur"; \
+	  echo "HEAD = $$new"; \
+	  read -p "force re-tag at HEAD? [y/N] " ans; \
+	  if [[ "$${ans:-N}" == "y" || "$${ans:-N}" == "Y" ]]; then \
+	    git tag -f -a "v$$v" -m "Release v$$v"; \
+	  else \
+	    echo "keeping existing tag"; \
+	  fi; \
+	else \
+	  git tag -a "v$$v" -m "Release v$$v"; \
+	fi
+
+tag-push:
+	@v=$$(cat VERSION); \
+	echo "=== Pushing tag v$$v + GitHub release ==="; \
+	if git ls-remote --exit-code --tags origin "v$$v" >/dev/null 2>&1; then \
+	  read -p "tag v$$v exists on remote. force push? [y/N] " ans; \
+	  if [[ "$${ans:-N}" == "y" || "$${ans:-N}" == "Y" ]]; then \
+	    git push --force origin "v$$v"; \
+	  else \
+	    echo "skipping remote tag push"; \
+	  fi; \
+	else \
+	  git push origin "v$$v"; \
+	fi; \
+	if gh release view "v$$v" >/dev/null 2>&1; then \
+	  gh release upload "v$$v" "build/ColumnTamer-$$v.pkg" --clobber; \
+	else \
+	  gh release create "v$$v" --title "v$$v" --notes "See README." "build/ColumnTamer-$$v.pkg"; \
+	fi; \
+	echo "DONE: https://github.com/keen99/columntamer/releases/tag/v$$v"
 
 tag:
 	@v=$$(cat VERSION); \
