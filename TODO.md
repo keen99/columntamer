@@ -42,6 +42,61 @@ All HIGH/MEDIUM items resolved. LOW cleanup items tracked below.
 ## ✅ Verify not broken (skip unless regression)
 - bundle-ID guard, @try/@catch, idempotent install, 3 swizzles, sdef codes
 
+## 🔴 HIGH — reengineer ColumnTamerHelper (current shell-script solution unacceptable)
+
+- [ ] **Replace shell helper with compiled Swift .app bundle**
+  - Current: zsh script `while true` polling pgrep every 5s. Multiple bugs:
+    1. `open` on shell script = Terminal.app spawns visible window (hit 2026-07-17)
+    2. Hardcoded `/usr/bin/launchctl` broke on macOS 15 (moved to `/bin`)
+    3. Poll loop = CPU ticks forever, 5s Finder-restart latency
+    4. No signal handling, no clean shutdown
+    5. Plain exec not .app = System Settings shows wrong name
+       (violates AGENTS.md: "Menu/helper = real .app bundle with CFBundleName + LSUIElement")
+    6. Reinject spam on Finder PID flicker (crash loops = inject thrash)
+    7. No entitlement-clean TCC (shell = ambient user perms)
+  - Target: Swift (or ObjC) menubar-style .app
+    - CFBundleName="ColumnTamerHelper", LSUIElement=true (no Dock icon)
+    - Bundle ID: `columntamer.helper`
+    - Sign same as menu app (Apple Dev dev / Developer ID release)
+  - Core mechanism — event-driven NOT poll:
+    - A. `NSWorkspaceDidLaunchApplicationNotification` /
+      `NSWorkspaceDidTerminateApplicationNotification` for Finder
+      (`NSWorkspace.shared.notificationCenter`). Instant, zero CPU. PREFERRED.
+    - B. fallback: `dispatch_source_t` on Finder task port (overkill)
+  - On Finder (re)launch:
+    - Brief settle wait via NSTimer 1-2s (not sleep)
+    - Inject via `NSAppleEventDescriptor` (not shell osascript)
+    - Backoff on fail (keep MAX_FAILS=6 logic, port to Swift)
+    - Log to `os_log` unified logging (not ~/Library/Logs flat file)
+  - Packaging:
+    - Helper .app staged like menu .app in pkgroot
+    - LaunchAgent `ProgramArguments[0]` = helper .app executable direct (Mach-O)
+      per AGENTS.md "never wrap in /bin/sh" — Sys Settings shows real name
+    - postinstall: NEVER `open` helper. LaunchAgent owns lifecycle
+      (enable+kickstart if 15 auto-disabled, else RunAtLoad at login)
+  - Lifecycle:
+    - launchd KeepAlive=true relaunch on crash
+    - SIGTERM handler: cancel observers, exit 0
+    - No lockfile (AGENTS.md: launchd Label singleton)
+  - Signing/arch:
+    - Universal: x86_64 + arm64 + arm64e (match osax + menu)
+    - `-target ...-apple-macosx10.15` (keep floor)
+    - Arch guard in build script (catch regress like menu-app had)
+  - Acceptance:
+    - No Terminal window on install ever
+    - No hardcoded `/usr/bin` paths (bare cmds / Bundle paths)
+    - Finder restart detected <1s
+    - Sys Settings → Login Items shows "ColumnTamerHelper" not "sh"
+    - Clean uninstall (kill + rm + Finder restart, osax flushed from RAM)
+    - Works 10.15 / 14 / 15 (Intel + Apple Silicon)
+  - Files:
+    - New: `helper-src/Main.swift`, `helper-src/Info.plist`, `helper-app/build.sh`
+    - Delete: `ColumnTamerHelper` (shell script)
+    - Update: `scripts/build.sh` (build helper .app alongside menu .app)
+    - Update: `scripts/pkg-scripts/postinstall` (drop helper spawn, LaunchAgent only)
+    - Update: `scripts/devinstall.sh`, `scripts/uninstall.sh` (new paths)
+    - Update: `AGENTS.md` (helper now .app, drop shell-script mention)
+
 ## 🔬 Future investigation
 
 - [ ] **Investigate breaking the ~240 preview-pane min-width floor**

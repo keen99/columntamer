@@ -21,10 +21,24 @@ Live pref reload via distributed notification --- no Finder restart needed after
 ## Requirements
 
 - macOS 10.15+ (built/tested on Sonoma 14.8, arm64 + arm64e)
-- **SIP off** --- required for unsigned scripting addition loading into Finder.
-  - Apple Dev / Developer ID signed osax works with SIP off alone.
-  - Ad-hoc/unsigned builds may need `amfi_get_out_of_my_way=1` boot-arg additionally.
-  - Apple will not notarize Finder osax injection.
+- **SIP off** --- required for scripting addition loading into Finder.
+  - **Disable SIP** (full off):
+    1. Reboot into Recovery: Apple Silicon = hold power button until boot
+       options; Intel = hold `Cmd+R` at boot.
+    2. Terminal (Utilities menu): `csrutil disable`
+    3. Reboot.
+    Re-enable: same steps, `csrutil enable`.
+  - **macOS 11 (Big Sur)+: Library Validation** --- Finder marked as platform
+    binary since Big Sur. System rejects non-platform code (our osax) injected
+    into Finder even with SIP fully off. Fix: disable Library Validation:
+    ```bash
+    sudo defaults write /Library/Preferences/com.apple.security.libraryvalidation.plist \
+      DisableLibraryValidation -bool true
+    killall Finder
+    ```
+    Re-enable: `-bool false`. Targeted (not full AMFI off). Verified working.
+  - Apple Dev / Developer ID signed osax works with SIP off + LV disabled.
+  - Apple will not notarize Finder osax injection (same as XtraFinder).
   - Target audience = existing XtraFinder users (already SIP off).
 
 

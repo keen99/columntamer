@@ -12,6 +12,18 @@ let loginAgentPlist = "/Library/LaunchAgents/columntamer.menu.plist"
 // single-instance: named lock + activate notification
 let ctActivateNote = "columntamer.menu.activate"
 
+/// Shell out, capture stdout+stderr. PATH-resolved cmds (no hardcoded /usr/bin).
+func ctShell(_ cmd: String) -> String {
+    let t = Process()
+    let p = Pipe()
+    t.launchPath = "/bin/zsh"
+    t.arguments = ["-c", cmd]
+    t.standardOutput = p
+    t.standardError = p
+    do { try t.run(); t.waitUntilExit() } catch { return "" }
+    return String(data: p.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+}
+
 @main
 struct Main {
     static func main() {
@@ -101,6 +113,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return img
     }
 
+    /// Why osax inactive. Returns (menuLabel, openDiagOnSelect).
+    /// Causes (macOS 11+): Library Validation blocks non-platform code in
+    /// platform-binary Finder even with SIP off.
+    private func inactiveReason() -> (String, Bool) {
+        let osaxPath = "/Library/ScriptingAdditions/ColumnTamer.osax"
+        let osaxExists = !ctShell("ls -ld \(osaxPath) 2>&1").contains("No such")
+        if !osaxExists { return ("(osax missing — reinstall)", true) }
+
+        let csr = ctShell("csrutil status 2>&1").lowercased()
+        let sipOff = csr.contains("unknown") || csr.contains("disabled")
+        if !sipOff { return ("(SIP on — see Diagnostics)", true) }
+
+        // Library Validation plist key (macOS 11+, real cause).
+        let lv = ctShell("defaults read /Library/Preferences/com.apple.security.libraryvalidation DisableLibraryValidation 2>&1").trimmingCharacters(in: .whitespacesAndNewlines)
+        let lvDisabled = (lv == "1")
+        if !lvDisabled { return ("(Library Validation blocks — see Diagnostics)", true) }
+
+        return ("(restart Finder)", false)
+    }
+
     private func buildMenu() {
         let menu = NSMenu()
         menu.addItem(withTitle: "ColumnTamer", action: nil, keyEquivalent: "").isEnabled = false
@@ -111,7 +143,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let ageStr = age < 60 ? "\(age)s ago" : "\(age/60)m ago"
             healthItem = NSMenuItem(title: "ColumnTamer: active (\(ageStr))", action: nil, keyEquivalent: "")
         } else {
-            healthItem = NSMenuItem(title: "ColumnTamer: inactive (restart Finder)", action: #selector(restartFinder), keyEquivalent: "")
+            let (reason, needDiag) = inactiveReason()
+            healthItem = NSMenuItem(title: "ColumnTamer: inactive \(reason)",
+                                     action: needDiag ? #selector(showDiagnostics) : #selector(restartFinder),
+                                     keyEquivalent: "")
             healthItem.target = self
         }
         healthItem.isEnabled = (lastHealth == nil)  // clickable only if inactive (to restart)
@@ -463,48 +498,74 @@ final class DiagnosticsController: NSObject, NSWindowDelegate {
         }
     }
 
-    private func shell(_ cmd: String) -> String {
-        let t = Process()
-        let p = Pipe()
-        t.launchPath = "/bin/zsh"
-        t.arguments = ["-c", cmd]
-        t.standardOutput = p
-        t.standardError = p
-        do { try t.run(); t.waitUntilExit() } catch { return "(error: \(error))" }
-        return String(data: p.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-    }
-
     private func section(_ title: String) { report += "\n=== \(title) ===\n" }
     private func kv(_ k: String, _ v: String) { report += "\(k): \(v)\n" }
+
+    /// Parse system state → verdict + fix. macOS 11+ real cause = Library Validation
+    /// (Finder platform binary, rejects non-platform osax). SIP off alone insufficient.
+    private func analyzeOsaxLoad(csrutil: String, lvValue: String,
+                                 osaxExists: Bool, osaxInFinder: Bool) -> String {
+        if !osaxExists { return "osax missing — reinstall (not at /Library/ScriptingAdditions/ColumnTamer.osax)" }
+        if osaxInFinder { return "OK — osax loaded into Finder" }
+
+        let sipOff = csrutil.lowercased().contains("unknown") || csrutil.lowercased().contains("disabled")
+        if !sipOff {
+            return "SIP ON — osax cannot load. Fix: reboot Recovery, `csrutil disable`, reboot."
+        }
+
+        // macOS 11+: Library Validation gate.
+        let lvDisabled = lvValue.trimmingCharacters(in: .whitespacesAndNewlines) == "1"
+        if !lvDisabled {
+            return "Library Validation blocks osax (Finder = platform binary since Big Sur). " +
+                   "Fix: `sudo defaults write /Library/Preferences/com.apple.security.libraryvalidation.plist " +
+                   "DisableLibraryValidation -bool true` then `killall Finder`."
+        }
+        return "osax blocked despite SIP off + LV disabled. `killall Finder`. If persists, report diag."
+    }
 
     private func gather() {
         report = "ColumnTamer Diagnostics — \(Date())\n"
 
         section("System")
-        kv("macOS", shell("sw_vers -productVersion").trimmingCharacters(in: .whitespacesAndNewlines))
-        kv("arch", shell("uname -m").trimmingCharacters(in: .whitespacesAndNewlines))
+        kv("macOS", ctShell("sw_vers -productVersion").trimmingCharacters(in: .whitespacesAndNewlines))
+        kv("arch", ctShell("uname -m").trimmingCharacters(in: .whitespacesAndNewlines))
+
+        // Raw state (bare cmds — PATH-resolved; /usr/bin moved on macOS 15)
+        let csrutil  = ctShell("csrutil status 2>&1")
+        let lvValue  = ctShell("defaults read /Library/Preferences/com.apple.security.libraryvalidation DisableLibraryValidation 2>&1")
+        let osaxPath = "/Library/ScriptingAdditions/ColumnTamer.osax"
+        let lsOut    = ctShell("ls -ld \(osaxPath) 2>&1").trimmingCharacters(in: .whitespacesAndNewlines)
+        let osaxExists = !lsOut.contains("No such")
+        let codesign = ctShell("codesign -dv \(osaxPath) 2>&1").trimmingCharacters(in: .whitespacesAndNewlines)
+        let finderPid = ctShell("pgrep -x Finder").trimmingCharacters(in: .whitespacesAndNewlines)
+        let osaxInFinder = osaxExists && !finderPid.isEmpty
+            ? !ctShell("lsof -p \(finderPid) 2>/dev/null | grep -i ColumnTamer.osax").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            : false
 
         section("Security")
-        kv("SIP", shell("/usr/bin/csrutil status").trimmingCharacters(in: .whitespacesAndNewlines))
-        kv("boot-args", shell("/usr/sbin/nvram boot-args 2>/dev/null").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "(none)" : shell("/usr/sbin/nvram boot-args 2>/dev/null").trimmingCharacters(in: .whitespacesAndNewlines))
+        kv("SIP", csrutil.trimmingCharacters(in: .whitespacesAndNewlines))
+        kv("LibraryValidation DisableLibraryValidation", lvValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "(unset — LV enforced)" : lvValue.trimmingCharacters(in: .whitespacesAndNewlines))
 
         section("Osax")
-        let osax = "/Library/ScriptingAdditions/ColumnTamer.osax"
-        kv("path", osax)
-        let ls = shell("/bin/ls -ld \(osax) 2>&1").trimmingCharacters(in: .whitespacesAndNewlines)
-        kv("exists", ls.contains("No such") ? "NO" : "yes")
-        kv("stat", ls)
-        kv("codesign", shell("/usr/bin/codesign -dv \(osax) 2>&1").trimmingCharacters(in: .whitespacesAndNewlines))
+        kv("path", osaxPath)
+        kv("exists", osaxExists ? "yes" : "NO")
+        kv("stat", lsOut)
+        kv("codesign", codesign)
+        kv("loaded in Finder", osaxInFinder ? "YES" : "NO")
 
         section("Agents")
-        kv("helper", shell("/bin/launchctl list columntamer.helper 2>&1 | /usr/bin/head -5").trimmingCharacters(in: .whitespacesAndNewlines))
-        kv("menu", shell("/bin/launchctl list columntamer.menu 2>&1 | /usr/bin/head -5").trimmingCharacters(in: .whitespacesAndNewlines))
+        kv("helper", ctShell("launchctl list columntamer.helper 2>&1 | head -5").trimmingCharacters(in: .whitespacesAndNewlines))
+        kv("menu", ctShell("launchctl list columntamer.menu 2>&1 | head -5").trimmingCharacters(in: .whitespacesAndNewlines))
         kv("helper log", "~/Library/Logs/ColumnTamer/ColumnTamerHelper.log")
-        kv("helper log tail", shell("/usr/bin/tail -20 ~/Library/Logs/ColumnTamer/ColumnTamerHelper.log 2>&1").trimmingCharacters(in: .whitespacesAndNewlines))
+        kv("helper log tail", ctShell("tail -20 ~/Library/Logs/ColumnTamer/ColumnTamerHelper.log 2>&1").trimmingCharacters(in: .whitespacesAndNewlines))
 
         section("Finder")
-        kv("pid", shell("/usr/bin/pgrep -x Finder").trimmingCharacters(in: .whitespacesAndNewlines))
-        kv("ColumnTamer log (last 2m)", shell("/usr/bin/log show --predicate 'process==\"Finder\"' --last 2m 2>&1 | /usr/bin/grep ColumnTamer | /usr/bin/tail -20").trimmingCharacters(in: .whitespacesAndNewlines))
+        kv("pid", finderPid)
+        kv("ColumnTamer log (last 2m)", ctShell("log show --predicate 'process==\"Finder\"' --last 2m 2>&1 | grep ColumnTamer | tail -20").trimmingCharacters(in: .whitespacesAndNewlines))
+
+        section("Analysis")
+        kv("verdict", analyzeOsaxLoad(csrutil: csrutil, lvValue: lvValue,
+                                      osaxExists: osaxExists, osaxInFinder: osaxInFinder))
 
         section("Health (menu app view)")
         if let h = AppDelegate.sharedHealth {
@@ -514,8 +575,8 @@ final class DiagnosticsController: NSObject, NSWindowDelegate {
         }
 
         section("Prefs")
-        kv("ColumnTamerMinWidth", shell("/usr/bin/defaults read com.apple.finder ColumnTamerMinWidth 2>&1").trimmingCharacters(in: .whitespacesAndNewlines))
-        kv("ColumnTamerMaxWidth", shell("/usr/bin/defaults read com.apple.finder ColumnTamerMaxWidth 2>&1").trimmingCharacters(in: .whitespacesAndNewlines))
+        kv("ColumnTamerMinWidth", ctShell("defaults read com.apple.finder ColumnTamerMinWidth 2>&1").trimmingCharacters(in: .whitespacesAndNewlines))
+        kv("ColumnTamerMaxWidth", ctShell("defaults read com.apple.finder ColumnTamerMaxWidth 2>&1").trimmingCharacters(in: .whitespacesAndNewlines))
 
         textView.string = report
     }
