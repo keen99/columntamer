@@ -10,7 +10,7 @@ LOGDIR="${HOME}/Library/Logs/ColumnTamer"
 mkdir -p "$LOGDIR"
 LOG="${LOGDIR}/ColumnTamerHelper.log"
 
-log() { /bin/echo "$(/bin/date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG"; }
+log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG"; }
 
 log "ColumnTamerHelper started"
 
@@ -23,7 +23,7 @@ fail_count=0
 backoff=5
 
 while true; do
-  finder_pid="$(/usr/bin/pgrep -x Finder | /usr/bin/head -n 1 || true)"
+  finder_pid="$(pgrep -x Finder | head -n 1 || true)"
 
   if [[ -z "${finder_pid}" ]]; then
     : # Finder not running, wait
@@ -32,8 +32,8 @@ while true; do
     fail_count=0
     backoff=5
     log "Finder PID changed: ${last_pid:-none} -> ${finder_pid}; injecting ColumnTamer"
-    /bin/sleep 2
-    if /usr/bin/osascript -e 'tell application "Finder" to «event CTmrIjct»' 2>/dev/null; then
+    sleep 2
+    if osascript -e 'tell application "Finder" to «event CTmrIjct»' 2>/dev/null; then
       log "ColumnTamer inject event sent"
       last_pid="${finder_pid}"
     else
@@ -52,5 +52,5 @@ while true; do
     fi
   fi
 
-  /bin/sleep "${backoff}"
+  sleep "${backoff}"
 done

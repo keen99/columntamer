@@ -14,7 +14,7 @@ UIDU="$(id -u)"
 echo "=== stop old agents ==="
 launchctl bootout gui/$UIDU/columntamer.helper 2>/dev/null || true
 launchctl bootout gui/$UIDU/columntamer.menu 2>/dev/null || true
-/usr/bin/killall ColumnTamerMenu 2>/dev/null || true
+killall ColumnTamerMenu 2>/dev/null || true
 
 echo "=== install osax (sudo) ==="
 sudo -v
@@ -53,7 +53,7 @@ open "$MENU_APP" || echo "  (open failed)"
 
 echo "=== restart Finder to load osax ==="
 echo "  osax constructor runs at Finder launch. Kill Finder to reload."
-sudo /usr/bin/killall Finder || true
+sudo killall Finder || true
 echo "  Finder restarting — osax should load automatically."
 
 echo

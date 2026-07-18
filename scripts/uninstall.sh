@@ -8,8 +8,8 @@ APPROOT="/Library/Application Support/ColumnTamer"
 MENU_APP="/Library/Application Support/ColumnTamer/ColumnTamerMenu.app"
 LOG="/tmp/columntamer-postinstall.log"
 
-CONSOLE_USER="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || echo "$USER")"
-CONSOLE_UID="$(/usr/bin/id -u "$CONSOLE_USER")"
+CONSOLE_USER="$(stat -f%Su /dev/console 2>/dev/null || echo "$USER")"
+CONSOLE_UID="$(id -u "$CONSOLE_USER")"
 
 echo "=== stop agents (current + legacy labels) ==="
 # disable (clear login flag) then bootout (unload). bootout runs as user (user domain).
@@ -23,7 +23,7 @@ for lbl in \
 done
 
 # quit menu app if still running
-/usr/bin/killall ColumnTamerMenu 2>/dev/null || true
+killall ColumnTamerMenu 2>/dev/null || true
 
 echo "=== remove files ==="
 sudo rm -rf "$OSAX"
@@ -54,23 +54,23 @@ sudo pkgutil --forget columntamer 2>/dev/null || true
 sudo pkgutil --forget com.local.columntamer 2>/dev/null || true
 
 echo "=== remove prefs ==="
-/usr/bin/defaults delete com.apple.finder ColumnTamerMinWidth 2>/dev/null || true
-/usr/bin/defaults delete com.apple.finder ColumnTamerMaxWidth 2>/dev/null || true
-/usr/bin/defaults delete com.apple.finder ColumnTamerPreviewWidth 2>/dev/null || true
+defaults delete com.apple.finder ColumnTamerMinWidth 2>/dev/null || true
+defaults delete com.apple.finder ColumnTamerMaxWidth 2>/dev/null || true
+defaults delete com.apple.finder ColumnTamerPreviewWidth 2>/dev/null || true
 
 # clear stale install log
 rm -f "$LOG"
 
 echo "=== restart Finder to clear live injection ==="
-if /usr/bin/pgrep -x Finder >/dev/null 2>&1; then
+if pgrep -x Finder >/dev/null 2>&1; then
   echo "  killing Finder (menubar will blink ~2s)..."
-  /usr/bin/killall Finder
+  killall Finder
   # wait for Finder to relaunch (launchd auto-respawns)
   for i in 1 2 3 4 5; do
-    /usr/bin/pgrep -x Finder >/dev/null 2>&1 && break
-    /bin/sleep 1
+    pgrep -x Finder >/dev/null 2>&1 && break
+    sleep 1
   done
-  if /usr/bin/pgrep -x Finder >/dev/null 2>&1; then
+  if pgrep -x Finder >/dev/null 2>&1; then
     echo "  Finder restarted — osax fully unloaded."
   else
     echo "  ⚠ Finder did not relaunch within 5s. Open a Finder window to trigger it."
