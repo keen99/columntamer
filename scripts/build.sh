@@ -32,6 +32,14 @@ MODE="${1:-run}"
 # ── Shared metadata ────────────────────────────────────────────────────────
 [[ -f VERSION ]] || { echo "✗ VERSION missing"; exit 1; }
 VERSION="$(tr -d '[:space:]' < VERSION)"
+# Release vs dev: tag v0.1.0-test exactly at HEAD = release. Else dev.
+# Distinguish live release pkg from post-release dev builds.
+if git describe --tags --exact-match HEAD 2>/dev/null | grep -qx "v0.1.0-test"; then
+  SUFFIX=""
+else
+  SUFFIX="-dev"
+fi
+VERSION_FULL="${VERSION}${SUFFIX}"
 GIT_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo dev)"
 GIT_BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo dev)"
 BUILD_DATE="$(date -u '+%Y-%m-%d %H:%M UTC')"
@@ -45,7 +53,7 @@ printf '%s\n' "$((BUILD_NUM + 1))" > "$BUILD_NUM_FILE"
 if ! git diff --quiet -- . ':!BUILD_NUMBER' || ! git diff --cached --quiet -- . ':!BUILD_NUMBER'; then
   GIT_COMMIT="${GIT_COMMIT}-dirty"
 fi
-echo "▸ Version $VERSION (build $BUILD_NUM, commit $GIT_COMMIT, mode=$MODE)"
+echo "▸ Version $VERSION_FULL (build $BUILD_NUM, commit $GIT_COMMIT, mode=$MODE)"
 
 OSAX="$ROOT/build/ColumnTamer.osax"
 MENU="$ROOT/build/menubuild/ColumnTamer.app"
@@ -150,7 +158,7 @@ do_sigcheck() {
 do_package() {
   local stage="$ROOT/build/pkgroot"
   local scripts_dir="$ROOT/build/pkgscripts"
-  local pkg="$ROOT/build/ColumnTamer-$VERSION.pkg"
+  local pkg="$ROOT/build/ColumnTamer-$VERSION_FULL.pkg"
 
   echo "▸ Stage payload"
   rm -rf "$stage" "$scripts_dir" "$pkg"
@@ -241,7 +249,7 @@ XML
 
   echo
   echo "══════════════════════════════════════════════════════════"
-  echo " ✓ Packaged $VERSION (build $BUILD_NUM)"
+  echo " ✓ Packaged $VERSION_FULL (build $BUILD_NUM)"
   if [[ "$notarize" -eq 1 ]]; then
     echo "   Notarized + stapled"
   else
