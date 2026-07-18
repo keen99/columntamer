@@ -160,8 +160,6 @@ do_package() {
            "$scripts_dir"
 
   cp -R "$OSAX" "$stage/Library/ScriptingAdditions/ColumnTamer.osax"
-  cp "$ROOT/ColumnTamerHelper" "$stage/Library/Application Support/ColumnTamer/ColumnTamerHelper"
-  chmod 755 "$stage/Library/Application Support/ColumnTamer/ColumnTamerHelper"
   # Flatten menu .app to separate files — PackageKit relocates bundles with
   # matching CFBundleIdentifier. Flat files have no bundle ID → no relocation.
   # Postinstall assembles .app from these files and re-signs.
@@ -172,7 +170,6 @@ do_package() {
   cp -R "$MENU/Contents/_CodeSignature" "$stage/Library/Application Support/ColumnTamer/ColumnTamerMenu.app/Contents/_CodeSignature" 2>/dev/null || true
   # Zap source bundle — no need keep after staging
   rm -rf "$OSAX" "$MENU"
-  cp "$ROOT/columntamer.helper.plist" "$stage/Library/LaunchAgents/columntamer.helper.plist"
   cp "$ROOT/columntamer.menu.plist" "$stage/Library/LaunchAgents/columntamer.menu.plist"
 
   # pkg-scripts: real committed files (source-controlled, reviewable).
