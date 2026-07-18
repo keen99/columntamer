@@ -159,17 +159,11 @@ do_package() {
            "$stage/Library/LaunchAgents" \
            "$scripts_dir"
 
-  cp -R "$OSAX" "$stage/Library/ScriptingAdditions/ColumnTamer.osax"
-  # Flatten menu .app to separate files — PackageKit relocates bundles with
-  # matching CFBundleIdentifier. Flat files have no bundle ID → no relocation.
-  # Postinstall assembles .app from these files and re-signs.
-  mkdir -p "$stage/Applications/ColumnTamer.app/Contents/MacOS"
-  mkdir -p "$stage/Applications/ColumnTamer.app/Contents/Resources"
-  cp "$MENU/Contents/MacOS/ColumnTamer" "$stage/Applications/ColumnTamer.app/Contents/MacOS/ColumnTamer"
-  cp "$MENU/Contents/Info.plist" "$stage/Applications/ColumnTamer.app/Contents/Info.plist"
-  cp "$MENU/Contents/PkgInfo" "$stage/Applications/ColumnTamer.app/Contents/PkgInfo" 2>/dev/null || true
-  cp "$MENU/Contents/Resources/appicon.icns" "$stage/Applications/ColumnTamer.app/Contents/Resources/appicon.icns" 2>/dev/null || true
-  cp -R "$MENU/Contents/_CodeSignature" "$stage/Applications/ColumnTamer.app/Contents/_CodeSignature" 2>/dev/null || true
+  ditto "$OSAX" "$stage/Library/ScriptingAdditions/ColumnTamer.osax"
+  # Stage real .app bundle (ditto preserves metadata/resource forks/xattr).
+  # BundleIsRelocatable=false in component-plist prevents PK relocate —
+  # no flatten trick needed.
+  ditto "$MENU" "$stage/Applications/ColumnTamer.app"
   # Zap source bundle — no need keep after staging
   rm -rf "$OSAX" "$MENU"
   cp "$ROOT/columntamer.menu.plist" "$stage/Library/LaunchAgents/columntamer.menu.plist"
@@ -247,13 +241,15 @@ XML
 
   echo
   echo "══════════════════════════════════════════════════════════"
-  echo " ✓ Packaged $VERSION"
+  echo " ✓ Packaged $VERSION (build $BUILD_NUM)"
   if [[ "$notarize" -eq 1 ]]; then
     echo "   Notarized + stapled"
   else
     echo "   Unsigned pkg (not notarized)"
   fi
-  echo "   pkg: $pkg"
+  echo "   commit: $GIT_COMMIT"
+  echo "   date:   $BUILD_DATE"
+  echo "   pkg:    $pkg"
   echo "   install: sudo installer -pkg \"$pkg\" -target /"
   echo "══════════════════════════════════════════════════════════"
 }

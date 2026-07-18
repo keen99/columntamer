@@ -24,13 +24,13 @@ launchctl bootout gui/$UIDU/columntamer.menu 2>/dev/null || true
 echo "=== install osax (sudo) ==="
 sudo -v
 sudo rm -rf "$OSAX"
-sudo cp -R ../build/ColumnTamer.osax "$OSAX"
+sudo ditto ../build/ColumnTamer.osax "$OSAX"
 sudo chown -R root:wheel "$OSAX"
 # signed by build step; do NOT re-sign ad-hoc (breaks Finder load)
 
 echo "=== install menu app ==="
 sudo rm -rf "$MENU_APP"
-sudo cp -R ../build/menubuild/ColumnTamer.app "$MENU_APP"
+sudo ditto ../build/menubuild/ColumnTamer.app "$MENU_APP"
 sudo chown -R root:wheel "$MENU_APP"
 # signed by build step; do NOT re-sign ad-hoc
 
