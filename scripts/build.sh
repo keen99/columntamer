@@ -32,10 +32,19 @@ MODE="${1:-run}"
 # ── Shared metadata ────────────────────────────────────────────────────────
 [[ -f VERSION ]] || { echo "✗ VERSION missing"; exit 1; }
 VERSION="$(tr -d '[:space:]' < VERSION)"
-BUILD_NUM="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
 GIT_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo dev)"
 GIT_BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo dev)"
 BUILD_DATE="$(date -u '+%Y-%m-%d %H:%M UTC')"
+# Build # = persisted counter (BUILD_NUMBER file = last used, tracked in git).
+# Read N, stamp N as this build's #, then bump file to N+1 for next build.
+BUILD_NUM_FILE="$ROOT/BUILD_NUMBER"
+BUILD_NUM="$(tr -d '[:space:]' < "$BUILD_NUM_FILE" 2>/dev/null || echo 0)"
+printf '%s\n' "$((BUILD_NUM + 1))" > "$BUILD_NUM_FILE"
+# Dirty = uncommitted changes (excl BUILD_NUMBER which we just bumped).
+# Commit hash-dirty = enough trace. Build # stays clean integer.
+if ! git diff --quiet -- . ':!BUILD_NUMBER' || ! git diff --cached --quiet -- . ':!BUILD_NUMBER'; then
+  GIT_COMMIT="${GIT_COMMIT}-dirty"
+fi
 echo "▸ Version $VERSION (build $BUILD_NUM, commit $GIT_COMMIT, mode=$MODE)"
 
 OSAX="$ROOT/build/ColumnTamer.osax"
