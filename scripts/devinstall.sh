@@ -5,7 +5,8 @@ set -eu
 cd "$(dirname "$0")"
 
 OSAX="/Library/ScriptingAdditions/ColumnTamer.osax"
-MENU_APP="/Applications/ColumnTamerMenu.app"
+MENU_APP="/Applications/ColumnTamer.app"
+MENU_LEGACY="/Applications/ColumnTamerMenu.app"
 LEGACY_APPROOT="/Library/Application Support/ColumnTamer"
 MENU_PLIST="/Library/LaunchAgents/columntamer.menu.plist"
 UIDU="$(id -u)"
@@ -15,8 +16,10 @@ echo "=== stop old agents ==="
 launchctl bootout gui/$UIDU/columntamer.helper 2>/dev/null || true
 sudo rm -f "/Library/LaunchAgents/columntamer.helper.plist" 2>/dev/null || true
 pkill -f "ColumnTamerHelper" 2>/dev/null || true
+pkill -f "ColumnTamer" 2>/dev/null || true
+# legacy dev-run menu (pre-rename build path)
+pkill -f "build/menubuild/ColumnTamerMenu" 2>/dev/null || true
 launchctl bootout gui/$UIDU/columntamer.menu 2>/dev/null || true
-pkill -f "ColumnTamerMenu" 2>/dev/null || true
 
 echo "=== install osax (sudo) ==="
 sudo -v
@@ -27,11 +30,12 @@ sudo chown -R root:wheel "$OSAX"
 
 echo "=== install menu app ==="
 sudo rm -rf "$MENU_APP"
-sudo cp -R ../build/menubuild/ColumnTamerMenu.app "$MENU_APP"
+sudo cp -R ../build/menubuild/ColumnTamer.app "$MENU_APP"
 sudo chown -R root:wheel "$MENU_APP"
 # signed by build step; do NOT re-sign ad-hoc
 
-echo "=== remove legacy approot (pre-rehome) ==="
+echo "=== remove legacy menu (pre-rename) + approot (pre-rehome) ==="
+sudo rm -rf "$MENU_LEGACY"
 sudo rm -rf "$LEGACY_APPROOT"
 
 echo "=== install LaunchAgent ==="

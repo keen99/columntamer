@@ -34,7 +34,7 @@ Different from mailframe/ocular (app-type). Columntamer injects into Finder:
   (Finder loads scripting additions only from system path)
 - **helper** → `/Library/Application Support/ColumnTamer/ColumnTamerHelper`
   (watches Finder PID, re-injects on Finder restart)
-- **menu app** → `/Library/Application Support/ColumnTamer/ColumnTamerMenu.app`
+- **menu app** → `/Applications/ColumnTamer.app`
   (LSUIElement menubar UI — prefs, diagnostics, enable toggle)
 - **LaunchAgents** → `/Library/LaunchAgents/columntamer.{helper,menu}.plist`
 

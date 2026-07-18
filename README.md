@@ -102,7 +102,7 @@ sudo installer -pkg build/ColumnTamer-$VERSION.pkg -target /
 
 Installs:
 - osax → `/Library/ScriptingAdditions/ColumnTamer.osax`
-- menu app → `/Applications/ColumnTamerMenu.app`
+- menu app → `/Applications/ColumnTamer.app`
 - LaunchAgent → `/Library/LaunchAgents/columntamer.menu.plist`
 
 Menu app provides prefs panel + health indicator + Finder-reinject poll (osax reload on Finder restart).

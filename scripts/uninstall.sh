@@ -5,7 +5,8 @@ set -eu
 
 OSAX="/Library/ScriptingAdditions/ColumnTamer.osax"
 LEGACY_APPROOT="/Library/Application Support/ColumnTamer"
-MENU_APP="/Applications/ColumnTamerMenu.app"
+MENU_APP="/Applications/ColumnTamer.app"
+MENU_LEGACY="/Applications/ColumnTamerMenu.app"
 LOG="/tmp/columntamer-postinstall.log"
 
 CONSOLE_USER="$(stat -f%Su /dev/console 2>/dev/null || echo "$USER")"
@@ -22,12 +23,19 @@ for lbl in \
   launchctl bootout  gui/$CONSOLE_UID/$lbl 2>/dev/null || true
 done
 
-# quit menu app if still running
+# quit menu app if still running (current + legacy name)
+killall ColumnTamer 2>/dev/null || true
 killall ColumnTamerMenu 2>/dev/null || true
+
+# stop legacy dev-run menu (build path)
+pkill -f "build/menubuild/ColumnTamer" 2>/dev/null || true
+pkill -f "build/menubuild/ColumnTamerMenu" 2>/dev/null || true
 
 echo "=== remove files ==="
 sudo rm -rf "$OSAX"
 sudo rm -rf "$MENU_APP"
+# Legacy name (pre-rename installs shipped ColumnTamerMenu.app).
+sudo rm -rf "$MENU_LEGACY"
 # Legacy approot from pre-rehome installs (menu now in /Applications).
 sudo rm -rf "$LEGACY_APPROOT"
 

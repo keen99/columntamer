@@ -7,7 +7,7 @@
   <string>columntamer.menu</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/Applications/ColumnTamerMenu.app/Contents/MacOS/ColumnTamerMenu</string>
+    <string>/Applications/ColumnTamer.app/Contents/MacOS/ColumnTamer</string>
   </array>
   <key>RunAtLoad</key>
   <true/>

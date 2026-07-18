@@ -1,56 +1,65 @@
-#!/bin/zsh
-# menu-app/build.sh — compile ColumnTamerMenu menubar app leaf (x86_64 + arm64 + arm64e).
-# UNSIGNED. Signing done by scripts/build.sh orchestrator (timed).
-# UNIVERSAL REQUIRED: all 3 archs. Intel Mac = x86_64 only. Dropping any slice
-# = silent "not supported on this version of macOS" on matching Mac. See AGENTS.md.
+#!/bin/bash
+# menu-app/build.sh — compile ColumnTamer menubar app leaf (x86_64 + arm64 + arm64e).
 set -eu
 cd "$(dirname "$0")"
-ROOT=$(pwd)/..
-BUILD="$ROOT/build/menubuild"
-APP="$BUILD/ColumnTamerMenu.app"
-
-echo "=== clean menu build ==="
-rm -rf "$BUILD"
+BUILD="$(pwd)/../build/menubuild"
+APP="$BUILD/ColumnTamer.app"
 mkdir -p "$BUILD"
 
-build_arch() {
-  local arch="$1"
-  echo "=== compile $arch ==="
+# xcodebuild requires a minimal xcodeproj or SDK; use swiftc direct + xcrun SDK.
+SDK="$(xcrun --show-sdk-path 2>/dev/null)"
+MACOS_MIN="10.15"
+
+# source files (glob .swift)
+SWIFT_ARGS=(
+  -target "x86_64-apple-macosx$MACOS_MIN"
+  -sdk "$SDK"
+  -parse-as-library
+  -framework Cocoa
+  -framework CoreFoundation
+  Main.swift
+)
+
+# Build per-arch (arm64e requires arm64e triple, no x86_64 cross).
+ARCHS=(x86_64 arm64 arm64e)
+for arch in "${ARCHS[@]}"; do
+  echo "▸ build $arch"
   swiftc \
-    -sdk "$(xcrun --sdk macosx --show-sdk-path)" \
-    -target ${arch}-apple-macosx10.15 \
+    -target "${arch}-apple-macosx$MACOS_MIN" \
+    -sdk "$SDK" \
     -parse-as-library \
-    -o "$BUILD/ColumnTamerMenu.$arch" \
-    "$ROOT/menu-app/Main.swift"
-}
+    -framework Cocoa \
+    -framework CoreFoundation \
+    -o "$BUILD/ColumnTamer.$arch" \
+    Main.swift
+done
 
-build_arch x86_64
-build_arch arm64
-build_arch arm64e
-
-echo "=== lipo ==="
+# lipo universal
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+echo "▸ lipo universal"
 lipo -create \
-  "$BUILD/ColumnTamerMenu.x86_64" \
-  "$BUILD/ColumnTamerMenu.arm64" \
-  "$BUILD/ColumnTamerMenu.arm64e" \
-  -output "$BUILD/ColumnTamerMenu"
+  "$BUILD/ColumnTamer.x86_64" \
+  "$BUILD/ColumnTamer.arm64" \
+  "$BUILD/ColumnTamer.arm64e" \
+  -output "$BUILD/ColumnTamer"
 
-echo "=== bundle (unsigned) ==="
-mkdir -p "$APP/Contents/MacOS"
-cp "$BUILD/ColumnTamerMenu"   "$APP/Contents/MacOS/ColumnTamerMenu"
-cp "$ROOT/menu-app/Info.plist" "$APP/Contents/Info.plist"
+# PkgInfo + Info.plist
+cp Info.plist "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
-# ── Arch guard: UNIVERSAL REQUIRED. Fail build (not runtime) if any slice missing. ──
-echo "=== arch check ==="
-_got=$(lipo -archs "$APP/Contents/MacOS/ColumnTamerMenu")
-for _a in x86_64 arm64 arm64e; do
-  case " $_got " in
-    *" $_a "*) ;;
-    *) { echo "✗ MISSING ARCH $_a (got: $_got). Intel/AppleSilicon boot would fail."; exit 1; } ;;
-  esac
-done
-echo "✓ universal: $_got"
+# Move binary
+cp "$BUILD/ColumnTamer"   "$APP/Contents/MacOS/ColumnTamer"
+# Icon
+if [[ -f appicon.icns ]]; then
+  cp appicon.icns "$APP/Contents/Resources/appicon.icns"
+fi
 
-echo "=== DONE (unsigned) ==="
-echo "app: $APP"
+# Arch guard
+_got=$(lipo -archs "$APP/Contents/MacOS/ColumnTamer")
+echo "▸ archs: $_got"
+if [[ "$_got" != *"x86_64"* ]] || [[ "$_got" != *"arm64"* ]] || [[ "$_got" != *"arm64e"* ]]; then
+  echo "⚠ arch slice missing in lipo output (got: $_got)"
+  exit 1
+fi
+
+echo "✓ Built $APP"

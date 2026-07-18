@@ -12,11 +12,13 @@ log "caller uid=$(id -u) user=$(id -un)"
 
 MENU_PLIST="/Library/LaunchAgents/columntamer.menu.plist"
 LEGACY_APPROOT="/Library/Application Support/ColumnTamer"
+MENU_LEGACY="/Applications/ColumnTamerMenu.app"
 FLAG="/var/run/.columntamer.restart"
 
-# Remove legacy approot from pre-rehome installs (menu now in /Applications).
+# Remove legacy approot (pre-rehome) + legacy menu name (pre-rename).
 # osax stays in /Library/ScriptingAdditions (Finder load path, required).
 rm -rf "$LEGACY_APPROOT"
+rm -rf "$MENU_LEGACY"
 
 # M6: pin ownership to root:wheel (installer runs as root; staged files
 # otherwise may carry dev-user ownership = persistence vector).
@@ -41,18 +43,20 @@ if [[ -n "$CONSOLE_UID" ]]; then
 fi
 
 # Stop menu LaunchAgent + kill strays before relaunch (no respawn race).
+# pkill ColumnTamer substring catches both ColumnTamer and ColumnTamerMenu
+# (legacy name).
 if [[ -n "$CONSOLE_UID" ]]; then
   launchctl asuser "$CONSOLE_UID" -- launchctl bootout \
     "gui/$CONSOLE_UID/columntamer.menu" 2>/dev/null || true
 fi
-pkill -f "ColumnTamerMenu" 2>/dev/null || true
+pkill -f "ColumnTamer" 2>/dev/null || true
 
 # Bridge current session. LaunchAgent owns future login/restart.
 # menu: `open` .app (LaunchServices). KeepAlive=false — user Quit respected
 # (menu = UI + reinject poll, osax independent).
 if [[ -n "$CONSOLE_UID" ]]; then
   log "opening menu..."
-  open "/Applications/ColumnTamerMenu.app" 2>/dev/null || true
+  open "/Applications/ColumnTamer.app" 2>/dev/null || true
   log "menu open done"
   log "ps after launch: $(ps ax | grep -i ColumnTamer | grep -v grep | tr '\n' '|')"
 fi

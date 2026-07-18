@@ -48,7 +48,7 @@ fi
 echo "▸ Version $VERSION (build $BUILD_NUM, commit $GIT_COMMIT, mode=$MODE)"
 
 OSAX="$ROOT/build/ColumnTamer.osax"
-MENU="$ROOT/build/menubuild/ColumnTamerMenu.app"
+MENU="$ROOT/build/menubuild/ColumnTamer.app"
 OSAX_SYS="/Library/ScriptingAdditions/ColumnTamer.osax"
 
 # ── do_build <Debug|Release>: compile leaves + stamp + sign ────────────────
@@ -92,7 +92,7 @@ do_build() {
   t2=$(date +%s)
   codesign --force --sign "$sign" ${hardsign[@]+"${hardsign[@]}"} "$OSAX/Contents/MacOS/ColumnTamer"
   codesign --force --sign "$sign" ${hardsign[@]+"${hardsign[@]}"} "$OSAX"
-  codesign --force --sign "$sign" ${hardsign[@]+"${hardsign[@]}"} "$MENU/Contents/MacOS/ColumnTamerMenu"
+  codesign --force --sign "$sign" ${hardsign[@]+"${hardsign[@]}"} "$MENU/Contents/MacOS/ColumnTamer"
   codesign --force --sign "$sign" ${hardsign[@]+"${hardsign[@]}"} "$MENU"
   t3=$(date +%s)
 
@@ -118,15 +118,15 @@ ASCRIPT
 # ── do_launch: kill menu, restart Finder, inject ───────────────────────────
 do_launch() {
   echo "▸ Launch menu app"
-  pkill -x ColumnTamerMenu 2>/dev/null || true
+  pkill -x ColumnTamer 2>/dev/null || true
   for i in $(seq 1 25); do
-    pgrep -x ColumnTamerMenu >/dev/null 2>&1 || break
+    pgrep -x ColumnTamer >/dev/null 2>&1 || break
     sleep 0.2
   done
-  pkill -x ColumnTamerMenu 2>/dev/null || true
+  pkill -x ColumnTamer 2>/dev/null || true
   sleep 0.3
   for i in 1 2 3; do
-    if open "$ROOT/build/menubuild/ColumnTamerMenu.app" 2>/dev/null; then break; fi
+    if open "$ROOT/build/menubuild/ColumnTamer.app" 2>/dev/null; then break; fi
     sleep 0.5
   done
 
@@ -163,11 +163,11 @@ do_package() {
   # Flatten menu .app to separate files — PackageKit relocates bundles with
   # matching CFBundleIdentifier. Flat files have no bundle ID → no relocation.
   # Postinstall assembles .app from these files and re-signs.
-  mkdir -p "$stage/Applications/ColumnTamerMenu.app/Contents/MacOS"
-  cp "$MENU/Contents/MacOS/ColumnTamerMenu" "$stage/Applications/ColumnTamerMenu.app/Contents/MacOS/ColumnTamerMenu"
-  cp "$MENU/Contents/Info.plist" "$stage/Applications/ColumnTamerMenu.app/Contents/Info.plist"
-  cp "$MENU/Contents/PkgInfo" "$stage/Applications/ColumnTamerMenu.app/Contents/PkgInfo" 2>/dev/null || true
-  cp -R "$MENU/Contents/_CodeSignature" "$stage/Applications/ColumnTamerMenu.app/Contents/_CodeSignature" 2>/dev/null || true
+  mkdir -p "$stage/Applications/ColumnTamer.app/Contents/MacOS"
+  cp "$MENU/Contents/MacOS/ColumnTamer" "$stage/Applications/ColumnTamer.app/Contents/MacOS/ColumnTamer"
+  cp "$MENU/Contents/Info.plist" "$stage/Applications/ColumnTamer.app/Contents/Info.plist"
+  cp "$MENU/Contents/PkgInfo" "$stage/Applications/ColumnTamer.app/Contents/PkgInfo" 2>/dev/null || true
+  cp -R "$MENU/Contents/_CodeSignature" "$stage/Applications/ColumnTamer.app/Contents/_CodeSignature" 2>/dev/null || true
   # Zap source bundle — no need keep after staging
   rm -rf "$OSAX" "$MENU"
   cp "$ROOT/columntamer.menu.plist" "$stage/Library/LaunchAgents/columntamer.menu.plist"
@@ -192,7 +192,7 @@ do_package() {
   # prior path (dev or pre-rehome install) = payload redirected away from
   # declared pkgroot. Force non-relocatable = PK honors stage paths.
   local complist="$ROOT/build/component.plist"
-  printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<array>\n<dict>\n<key>RootRelativeBundlePath</key>\n<string>Applications/ColumnTamerMenu.app</string>\n<key>BundleIsRelocatable</key>\n<false/>\n</dict>\n</array>\n</plist>\n' > "$complist"
+  printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<array>\n<dict>\n<key>RootRelativeBundlePath</key>\n<string>Applications/ColumnTamer.app</string>\n<key>BundleIsRelocatable</key>\n<false/>\n</dict>\n</array>\n</plist>\n' > "$complist"
   local comp="$ROOT/build/ColumnTamer-component.pkg"
   pkgbuild \
     --root "$stage" \

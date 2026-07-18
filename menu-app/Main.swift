@@ -1,4 +1,4 @@
-// ColumnTamerMenu — menubar status item + prefs panel.
+// ColumnTamer — menubar status item + prefs panel.
 // Lives in user session (LSUIElement app). Writes defaults to com.apple.finder.
 // Apply = write ColumnTamerMinWidth/MaxWidth + killall Finder (osax re-reads on relaunch).
 // Start-at-login = manage its own LaunchAgent.
