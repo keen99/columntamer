@@ -42,60 +42,80 @@ All HIGH/MEDIUM items resolved. LOW cleanup items tracked below.
 ## ✅ Verify not broken (skip unless regression)
 - bundle-ID guard, @try/@catch, idempotent install, 3 swizzles, sdef codes
 
-## 🔴 HIGH — reengineer ColumnTamerHelper (current shell-script solution unacceptable)
+## 🔴 HIGH — reengineer helper/menu/app architecture
 
-- [ ] **Replace shell helper with compiled Swift .app bundle**
-  - Current: zsh script `while true` polling pgrep every 5s. Multiple bugs:
-    1. `open` on shell script = Terminal.app spawns visible window (hit 2026-07-17)
-    2. Hardcoded `/usr/bin/launchctl` broke on macOS 15 (moved to `/bin`)
-    3. Poll loop = CPU ticks forever, 5s Finder-restart latency
-    4. No signal handling, no clean shutdown
-    5. Plain exec not .app = System Settings shows wrong name
-       (violates AGENTS.md: "Menu/helper = real .app bundle with CFBundleName + LSUIElement")
-    6. Reinject spam on Finder PID flicker (crash loops = inject thrash)
-    7. No entitlement-clean TCC (shell = ambient user perms)
-  - Target: Swift (or ObjC) menubar-style .app
-    - CFBundleName="ColumnTamerHelper", LSUIElement=true (no Dock icon)
-    - Bundle ID: `columntamer.helper`
-    - Sign same as menu app (Apple Dev dev / Developer ID release)
-  - Core mechanism — event-driven NOT poll:
-    - A. `NSWorkspaceDidLaunchApplicationNotification` /
-      `NSWorkspaceDidTerminateApplicationNotification` for Finder
-      (`NSWorkspace.shared.notificationCenter`). Instant, zero CPU. PREFERRED.
-    - B. fallback: `dispatch_source_t` on Finder task port (overkill)
-  - On Finder (re)launch:
-    - Brief settle wait via NSTimer 1-2s (not sleep)
-    - Inject via `NSAppleEventDescriptor` (not shell osascript)
-    - Backoff on fail (keep MAX_FAILS=6 logic, port to Swift)
-    - Log to `os_log` unified logging (not ~/Library/Logs flat file)
-  - Packaging:
-    - Helper .app staged like menu .app in pkgroot
-    - LaunchAgent `ProgramArguments[0]` = helper .app executable direct (Mach-O)
-      per AGENTS.md "never wrap in /bin/sh" — Sys Settings shows real name
-    - postinstall: NEVER `open` helper. LaunchAgent owns lifecycle
-      (enable+kickstart if 15 auto-disabled, else RunAtLoad at login)
-  - Lifecycle:
-    - launchd KeepAlive=true relaunch on crash
-    - SIGTERM handler: cancel observers, exit 0
-    - No lockfile (AGENTS.md: launchd Label singleton)
-  - Signing/arch:
-    - Universal: x86_64 + arm64 + arm64e (match osax + menu)
-    - `-target ...-apple-macosx10.15` (keep floor)
-    - Arch guard in build script (catch regress like menu-app had)
-  - Acceptance:
-    - No Terminal window on install ever
-    - No hardcoded `/usr/bin` paths (bare cmds / Bundle paths)
-    - Finder restart detected <1s
-    - Sys Settings → Login Items shows "ColumnTamerHelper" not "sh"
-    - Clean uninstall (kill + rm + Finder restart, osax flushed from RAM)
-    - Works 10.15 / 14 / 15 (Intel + Apple Silicon)
-  - Files:
-    - New: `helper-src/Main.swift`, `helper-src/Info.plist`, `helper-app/build.sh`
-    - Delete: `ColumnTamerHelper` (shell script)
-    - Update: `scripts/build.sh` (build helper .app alongside menu .app)
-    - Update: `scripts/pkg-scripts/postinstall` (drop helper spawn, LaunchAgent only)
-    - Update: `scripts/devinstall.sh`, `scripts/uninstall.sh` (new paths)
-    - Update: `AGENTS.md` (helper now .app, drop shell-script mention)
+Reference: XtraFinder dmg (`/Volumes/XtraFinder/`, Instruction.rtf, 2026-07-18).
+XF layout = `XtraFinder.app` + `XtraFinderInjector.osax` + `ScriptingAdditions/`
+symlink + `Instruction.rtf`. Drag install (no pkg). User copies:
+- `.app` → `/Applications`
+- `.osax` → `/Library/ScriptingAdditions`
+No helper process at all. Update = copy `.app` only. Uninstall = rm both +
+`defaults delete DisableLibraryValidation`.
+
+XF Instruction.rtf confirms our findings:
+- SIP off required (macOS 11+)
+- `sudo defaults write /Library/Preferences/com.apple.security.libraryvalidation.plist
+  DisableLibraryValidation -bool true` (Library Validation gate — our root cause
+  for osax load fail, AMFI kernel log proven 2026-07-18)
+- `sudo nvram boot-args=-arm64e_preview_abi` (Apple Silicon, third-party arm64e
+  load — we may need this for osax arm64e slice on ASi)
+
+- [ ] **Move menu `.app` to `/Applications`** (match XF + user-friendly relaunch)
+  - Current `/Library/Application Support/ColumnTamer/` = not Spotlight-findable,
+    not drag-launch, unfamiliar. AGENTS.md system-path layout was inherited
+    assumption, not requirement. XF = /Applications standard.
+  - Osax stays `/Library/ScriptingAdditions/` (Finder load path, required).
+  - Split locations = unavoidable (osax must be system path). Fine.
+  - No symlinks/aliases (unreliable on macOS, drift over time).
+  - Update build.sh pkgroot stage: `Applications/ColumnTamerMenu.app` +
+    `Library/ScriptingAdditions/ColumnTamer.osax`.
+  - Update LaunchAgent `ProgramArguments[0]` path → `/Applications/...`.
+  - Update devinstall.sh, uninstall.sh paths.
+
+- [ ] **Fold reinject logic into menu app, drop helper**
+  - Verified 2026-07-18: with Library Validation disabled, Finder auto-loads
+    osax on (re)launch. Helper reinject redundant for normal Finder restart.
+    (zinc test: killall Finder → osax reloaded in new Finder PID.)
+  - Helper still useful edge case: Finder crash mid-session where osax drops.
+    XF exhibits this too. But shell-script poll = expensive (5s loop + osascript
+    exec per cycle). Menu already runs NSApp event loop = free observer.
+  - Menu add `NSWorkspace.shared.notificationCenter` observer for
+    `NSWorkspaceDidLaunchApplicationNotification` / `DidTerminate` filtered to
+    Finder. Event-driven, zero CPU, instant. ~3 lines.
+  - On Finder (re)launch: NSTimer settle 1-2s, inject via NSAppleEventDescriptor
+    (not osascript shell), backoff on fail (port MAX_FAILS=6 logic).
+  - Delete `ColumnTamerHelper` shell script + `columntamer.helper` LaunchAgent.
+  - One LaunchAgent (`columntamer.menu`) owns everything. Simpler.
+  - Cuts: shell spawn bug, Terminal window bug, launchctl bootstrap dance,
+    dup-helper on reinstall, System Settings "David Raistrick" leak (helper
+    had no CFBundleName → cert name).
+
+- [ ] **Menu LaunchAgent policy: RunAtLoad=true, KeepAlive=false**
+  - Menu = UI only (prefs, status, diag). Osax in Finder does real work.
+    Menu dead does not stop CT functioning.
+  - Crash low-risk (Swift, simple UI). No auto-respawn needed.
+  - KeepAlive=true = user Quit respawns immediately (bad UX).
+  - RunAtLoad=true: launch at login. User Quit = stays quit until relogin or
+    manual relaunch (now easy via /Applications).
+  - Helper (if kept separate): KeepAlive=true. Must run. But if folded into
+    menu, only menu's RunAtLoad matters.
+
+- [ ] **If keeping helper (fallback if fold rejected)**
+  - Compile to Swift .app (CFBundleName="ColumnTamerHelper", LSUIElement=true,
+    bundle id `columntamer.helper`), sign same as menu.
+  - Event-driven not poll (NSWorkspace observer, not `while true` + pgrep).
+  - Log to `os_log` not flat file.
+  - SIGTERM handler, launchd KeepAlive=true.
+  - Universal x86_64 + arm64 + arm64e, -target macosx10.15, arch guard.
+
+- [ ] **Acceptance (architecture work overall)**
+  - `.app` in `/Applications`, launchable by user
+  - No Terminal window on install ever
+  - No hardcoded `/usr/bin` paths
+  - No helper dup-spawn, no shell-script poll
+  - System Settings → Login Items shows "ColumnTamerMenu" not "sh" or cert name
+  - Menu dead = CT still clamps columns (osax independent)
+  - Works 10.15 / 14 / 15 (Intel + Apple Silicon)
 
 ## 🔬 Future investigation
 
