@@ -42,6 +42,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // H2 health: last osax ack. nil = osax not loaded (no Finder inject yet).
     private var lastHealth: Date? = nil
     static var sharedHealth: Date? = nil   // diagnostics reads this
+    private var injectTimer: Timer?
+    private var injectFails = 0
+    private var injectBackoff = 5
 
     func applicationDidFinishLaunching(_ n: Notification) {
         // Single-instance: rely on launchd Label (one per Label by design).
@@ -66,6 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             CFNotificationCenterGetDistributedCenter(),
             Unmanaged.passUnretained(self).toOpaque(),
             { (_, observer, _, _, info) in
+                NSLog("[CT menu] health notif received: \(info ?? "nil" as CFTypeRef)")
                 guard let observer = observer else { return }
                 let app = Unmanaged<AppDelegate>.fromOpaque(observer).takeUnretainedValue()
                 app.lastHealth = Date()
@@ -85,6 +89,59 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.button?.imagePosition = .imageOnly
         statusItem.button?.toolTip = "ColumnTamer"
         buildMenu()
+
+        // Folded helper: poll inject every N sec. Osax broadcast health on
+        // inject -> menu observer catches -> status active. Backoff on fail.
+        // Replaces shell ColumnTamerHelper + LaunchAgent.
+        scheduleNextInject()
+    }
+
+    private func scheduleNextInject() {
+        let interval = TimeInterval(injectBackoff)
+        injectTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
+            self?.tickInject()
+        }
+    }
+
+    private func tickInject() {
+        DispatchQueue.global(qos: .background).async { [weak self] in
+            guard let self = self else { return }
+            let task = Process()
+            task.launchPath = "/usr/bin/osascript"
+            task.arguments = ["-e", "tell application \"Finder\" to «event CTmrIjct»"]
+            let pipe = Pipe()
+            task.standardOutput = pipe
+            task.standardError = pipe
+            do {
+                try task.run()
+                task.waitUntilExit()
+                if task.terminationStatus == 0 {
+                    self.injectFails = 0
+                    self.injectBackoff = 5
+                } else {
+                    self.injectFails += 1
+                    self.injectBackoff = min(self.injectBackoff * 2, 60)
+                    if self.injectFails >= 6 { self.injectBackoff = 60 }
+                    // Inject fail = osax not reachable (Finder restarting / dead).
+                    // Clear health so menu shows inactive reason.
+                    DispatchQueue.main.async {
+                        self.lastHealth = nil
+                        AppDelegate.sharedHealth = nil
+                        self.buildMenu()
+                    }
+                }
+            } catch {
+                self.injectBackoff = min(self.injectBackoff * 2, 60)
+                DispatchQueue.main.async {
+                    self.lastHealth = nil
+                    AppDelegate.sharedHealth = nil
+                    self.buildMenu()
+                }
+            }
+            DispatchQueue.main.async {
+                self.scheduleNextInject()
+            }
+        }
     }
 
     // Landscape glyph matching SF rectangle.split.3x1 proportions.

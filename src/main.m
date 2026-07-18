@@ -253,6 +253,20 @@ static void CTmrInstall(void) {
 // osax event handler (declared in Info.plist OSAXHandlers). No-op; load is what matters.
 OSStatus InjectHandler(const AppleEvent *ev, AppleEvent *reply, SRefCon refcon) {
     CTmrInstall();
+    // Broadcast health on inject too — menu launched after osax load misses
+    // ctor broadcast. Helper poll fires inject periodically = menu gets ack.
+    @try {
+        NSDictionary *hinfo = @{@"swizzles": @(CTmrSwizzledCount),
+                               @"at": [NSDate date]};
+        CFNotificationCenterPostNotification(
+            CFNotificationCenterGetDistributedCenter(),
+            CFSTR("columntamer.health"),
+            NULL,
+            (__bridge CFDictionaryRef)hinfo,
+            true);
+    } @catch (NSException *e) {
+        NSLog(@"[ColumnTamer] InjectHandler health broadcast failed: %@", e);
+    }
     // L10: report real status back to caller (helper). Text desc with
     // enabled/min/max so helper can log/branch on outcome.
     @try {
