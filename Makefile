@@ -17,7 +17,7 @@ export SIGN_TEAM := $(shell security find-certificate -c "$(SIGN_DEV_CERT)" -p 2
 	| grep -oE 'OU=[A-Z0-9]+' | cut -d= -f2)
 endif
 
-.PHONY: build run release package clean install-tools show-sign uninstall tag tag-build tag-push
+.PHONY: build run release package clean install-tools show-sign uninstall tag tag-build tag-push bump-after-release
 
 V := $(shell cat VERSION)
 
@@ -42,6 +42,7 @@ release:
 	$(MAKE) clean
 	scripts/build.sh package
 	$(MAKE) tag-push
+	$(MAKE) bump-after-release
 
 package:
 	scripts/build.sh package
@@ -97,15 +98,15 @@ tag-push:
 	fi; \
 	echo "DONE: https://github.com/keen99/columntamer/releases/tag/v$$v"
 
-tag:
+bump-after-release:
 	@v=$$(cat VERSION); \
-	echo "=== Tagging v$$v ==="; \
-	if git rev-parse "v$$v" >/dev/null 2>&1; then \
-	  echo "tag v$$v exists, skipping"; \
-	else \
-	  git tag -a "v$$v" -m "Release v$$v"; \
-	  git push origin "v$$v"; \
-	  echo "=== Creating GitHub release ==="; \
-	  gh release create "v$$v" --title "v$$v" --notes "See README." "build/ColumnTamer-$$v.pkg"; \
-	  echo "DONE: https://github.com/keen99/columntamer/releases/tag/v$$v"; \
-	fi
+	major=$$(echo "$$v" | cut -d. -f1); \
+	minor=$$(echo "$$v" | cut -d. -f2); \
+	patch=$$(echo "$$v" | cut -d. -f3); \
+	patch=$$((patch + 1)); \
+	new="$$major.$$minor.$$patch"; \
+	echo "$$new" > VERSION; \
+	git add VERSION BUILD_NUMBER; \
+	git commit -m "chore: bump version $$v -> $$new (post-release)"; \
+	echo "=== VERSION bumped $$v -> $$new, committed ==="; \
+	echo "next dev builds: $$new-dev"
