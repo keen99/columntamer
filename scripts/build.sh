@@ -164,9 +164,11 @@ do_package() {
   # matching CFBundleIdentifier. Flat files have no bundle ID → no relocation.
   # Postinstall assembles .app from these files and re-signs.
   mkdir -p "$stage/Applications/ColumnTamer.app/Contents/MacOS"
+  mkdir -p "$stage/Applications/ColumnTamer.app/Contents/Resources"
   cp "$MENU/Contents/MacOS/ColumnTamer" "$stage/Applications/ColumnTamer.app/Contents/MacOS/ColumnTamer"
   cp "$MENU/Contents/Info.plist" "$stage/Applications/ColumnTamer.app/Contents/Info.plist"
   cp "$MENU/Contents/PkgInfo" "$stage/Applications/ColumnTamer.app/Contents/PkgInfo" 2>/dev/null || true
+  cp "$MENU/Contents/Resources/appicon.icns" "$stage/Applications/ColumnTamer.app/Contents/Resources/appicon.icns" 2>/dev/null || true
   cp -R "$MENU/Contents/_CodeSignature" "$stage/Applications/ColumnTamer.app/Contents/_CodeSignature" 2>/dev/null || true
   # Zap source bundle — no need keep after staging
   rm -rf "$OSAX" "$MENU"
