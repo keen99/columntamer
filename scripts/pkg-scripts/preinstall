@@ -3,31 +3,50 @@
 # Runs as root pre-payload. launchctl asuser reaches user's Aqua session.
 set -u
 
+PLOG=/tmp/columntamer-preinstall.log
+plog() { echo "$(date '+%H:%M:%S') $*" >>"$PLOG"; }
+trap 'rc=$?; plog "EXIT rc=$rc (line $LINENO) flag=$([ -f "$FLAG" ] && echo SET || echo UNSET)"' EXIT
+plog "=== preinstall start pid=$$ ==="
+plog "caller uid=$(id -u) user=$(id -un)"
+plog "env COMMAND_LINE_INSTALL=${COMMAND_LINE_INSTALL:-unset}"
+
 FLAG="/var/run/.columntamer.restart"
 rm -f "$FLAG" 2>/dev/null || true
 
-CONSOLE_USER="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
-CONSOLE_UID="$(/usr/bin/id -u "$CONSOLE_USER" 2>/dev/null || true)"
-[[ -z "$CONSOLE_UID" ]] && exit 0
+# Forget stale pkg receipt + bundle reg. PK relocate bug: if bundle ID
+# registered to dev path (prior `make run`/devinstall), PK "updates in place"
+# = redirects install to old path, skipping /Library/... target. Forget forces
+# clean payload extraction to declared pkgroot paths.
+pkgutil --forget columntamer 2>/dev/null || true
+pkgutil --forget com.local.columntamer 2>/dev/null || true
+rm -f /var/db/receipts/columntamer.* /var/db/receipts/com.local.columntamer.* 2>/dev/null || true
+
+CONSOLE_USER="$(stat -f%Su /dev/console 2>/dev/null || true)"
+CONSOLE_UID="$(id -u "$CONSOLE_USER" 2>/dev/null || true)"
+plog "CONSOLE_USER=$CONSOLE_USER CONSOLE_UID=$CONSOLE_UID"
+[[ -z "$CONSOLE_UID" ]] && { plog "no console uid, exit"; exit 0; }
 
 # Native installer context: COMMAND_LINE_INSTALL=1 -> CLI `installer` binary.
 # Unset -> GUI Installer.app. CLI = unattended: skip dialog, default restart.
 if [[ "${COMMAND_LINE_INSTALL:-0}" == "1" ]]; then
-  /bin/echo "yes" > "$FLAG"
+  echo "yes" > "$FLAG"
   exit 0
 fi
 
-RESULT="$(launchctl asuser "$CONSOLE_UID" /usr/bin/osascript -e '
+plog "showing dialog (300s timeout)..."
+RESULT="$(launchctl asuser "$CONSOLE_UID" osascript -e '
   return button returned of (display dialog "ColumnTamer will be installed." & return & return & "Restart Finder afterward to activate?" with title "ColumnTamer" buttons {"Later", "Restart After Install"} default button "Restart After Install" with icon note giving up after 300)
 ' 2>/dev/null || true)"
+plog "dialog RESULT=$RESULT"
 
 if [[ "$RESULT" == *"Restart After Install"* ]]; then
-  /bin/echo "yes" > "$FLAG"
+  echo "yes" > "$FLAG"
 fi
 
 # Default restart if dialog fail (no tty, sandbox, timeout). Safer.
 if [[ ! -f "$FLAG" ]]; then
-  /bin/echo "yes" > "$FLAG"
+  plog "flag unset, defaulting to restart"
+  echo "yes" > "$FLAG"
 fi
 
 exit 0

@@ -2,6 +2,14 @@
 # postinstall: bootstrap LaunchAgent + restart Finder if user agreed preinstall.
 set -e
 
+LOG=/tmp/columntamer-postinstall.log
+log() { echo "$(date '+%H:%M:%S') $*" >>"$LOG"; }
+trap 'rc=$?; log "EXIT rc=$rc (line $LINENO)"' EXIT
+log "=== postinstall start (pid $$) ==="
+log "args: $*"
+log "caller uid=$(id -u) user=$(id -un)"
+log "env CONSOLE_USER=${CONSOLE_USER:-} CONSOLE_UID=${CONSOLE_UID:-}"
+
 BIN="/Library/Application Support/ColumnTamer/ColumnTamerHelper"
 HELPER_PLIST="/Library/LaunchAgents/columntamer.helper.plist"
 MENU_PLIST="/Library/LaunchAgents/columntamer.menu.plist"
@@ -19,35 +27,69 @@ chown -R root:wheel "/Library/ScriptingAdditions/ColumnTamer.osax"
 chown -R root:wheel "/Library/Application Support/ColumnTamer"
 chown root:wheel "$HELPER_PLIST" "$MENU_PLIST"
 
-CONSOLE_USER="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
-CONSOLE_UID="$(/usr/bin/id -u "$CONSOLE_USER" 2>/dev/null || true)"
+CONSOLE_USER="$(stat -f%Su /dev/console 2>/dev/null || true)"
+CONSOLE_UID="$(id -u "$CONSOLE_USER" 2>/dev/null || true)"
+log "detected CONSOLE_USER=$CONSOLE_USER CONSOLE_UID=$CONSOLE_UID"
 
-# bootstrap agents AS USER. RunAtLoad=true auto-launches; no kickstart (blocks).
-# bootstrap runs backgrounded so postinstall returns fast.
-# NOTE: postinstall run as root by package_script_service — no tty.
-# sudo -u fail here. root can bootstrap user gui domain directly.
+# Kill ALL instances first. Helper/menu run as argv[0]=binary but ps shows
+# zsh for helper (script via /bin/zsh). Match by full path to be safe.
+# Critical: helper is a `while true` loop — prior postinstall versions
+# direct-launched it (bypassing launchd), so reinstalls leaked dups.
+# Stop LaunchAgents first (bootout = launchd stops tracking, no respawn).
+# Then pkill strays. Without bootout, KeepAlive/helper respawns between
+# pkill and postinstall relaunch = dup instances.
+for lbl in columntamer.helper columntamer.menu; do
+  launchctl asuser "$CONSOLE_UID" launchctl bootout \
+    "gui/$CONSOLE_UID/$lbl" 2>/dev/null || true
+done
+pkill -f "/Library/Application Support/ColumnTamer/ColumnTamerHelper" 2>/dev/null || true
+pkill -f "/Library/Application Support/ColumnTamer/ColumnTamerMenu" 2>/dev/null || true
+
+# Bridge current session. LaunchAgent owns future login/restart.
+# - menu: `open` .app (LaunchServices) — GUI app, fine.
+# - helper: NEVER `open` — shell script, LaunchServices opens Terminal.app
+#   to run it (visible window). Use launchctl enable+kickstart (bare launchctl
+#   path — /usr/bin/launchctl gone on 15, now in /bin, PATH-resolved).
 if [[ -n "$CONSOLE_UID" ]]; then
-  # NOTE: launchctl bootstrap gui/$UID fail from package_script_service
-  # (EIO sandbox restriction). Plists install correctly — launchd picks
-  # them up on next login via RunAtLoad. For immediate effect, launch
-  # binaries directly via launchctl asuser (spawn in user context).
-  /usr/bin/killall ColumnTamerMenu 2>/dev/null || true
-  launchctl asuser "$CONSOLE_UID" /usr/bin/open "/Library/Application Support/ColumnTamer/ColumnTamerMenu.app" 2>/dev/null &
-  if [[ -x "$BIN" ]]; then
-    launchctl asuser "$CONSOLE_UID" "$BIN" 2>/dev/null &
-  fi
+  # menu: open the .app
+  log "opening menu..."
+  # menu: open .app for current session. LaunchAgent RunAtLoad owns future
+  # login. KeepAlive=false — user Quit respected (menu = UI only, osax
+  # independent).
+  launchctl asuser "$CONSOLE_UID" open \
+    "/Library/Application Support/ColumnTamer/ColumnTamerMenu.app" 2>/dev/null || true
+  log "menu open done"
+  # helper: bootstrap (register job if fresh) + kickstart. NEVER `open` —
+  # shell script, LaunchServices spawns Terminal.app. launchctl owns lifecycle.
+  # bootstrap idempotent (EIO if already loaded = ok).
+  log "helper bootstrap..."
+  launchctl asuser "$CONSOLE_UID" launchctl bootstrap \
+    "gui/$CONSOLE_UID" "/Library/LaunchAgents/columntamer.helper.plist" 2>/dev/null || true
+  log "helper enable..."
+  launchctl asuser "$CONSOLE_UID" launchctl enable \
+    "gui/$CONSOLE_UID/columntamer.helper" 2>/dev/null || true
+  log "helper kickstart (bg)..."
+  # background — kickstart blocks ~10s on spawn. LaunchAgent owns lifecycle.
+  launchctl asuser "$CONSOLE_UID" launchctl kickstart -k \
+    "gui/$CONSOLE_UID/columntamer.helper" 2>/dev/null &
+  log "helper kickstart dispatched"
+  log "ps after launch: $(ps ax | grep -i ColumnTamer | grep -v grep | tr '\n' '|')"
 fi
 
 # restart only if user agreed at preinstall prompt
 if [[ -f "$FLAG" ]]; then
-  /usr/bin/killall Finder 2>/dev/null || true
+  log "killall Finder (flag set)..."
+  killall Finder 2>/dev/null || true
+  log "killall Finder done"
   rm -f "$FLAG"
 else
+  log "no restart flag"
   if [[ -n "$CONSOLE_UID" ]]; then
-    launchctl asuser "$CONSOLE_UID" /usr/bin/osascript -e \
+    launchctl asuser "$CONSOLE_UID" osascript -e \
       'display notification "ColumnTamer installed. Restart Finder to activate." with title "ColumnTamer"' \
       2>/dev/null || true
   fi
 fi
 
+log "postinstall end"
 exit 0
